@@ -200,6 +200,43 @@ with app.app_context():
     seed_badges()
 
 
+# --- Seed spaces and events ---
+@app.route("/seed-content/<secret>")
+def seed_content(secret):
+    if secret != "abmc2026seed":
+        abort(404)
+    from datetime import timedelta
+    admin = User.query.filter_by(is_admin=True).first()
+    if not admin:
+        return "No admin user found."
+    spaces_data = [
+        ("The Vault", "Exclusive inner circle for high-level strategy, deal flow, and confidential discussions.", "space-the-vault.png"),
+        ("Business Strategy Room", "Where moves are planned. Strategic discussions on scaling, acquisitions, and partnerships.", "space-business-strategy.png"),
+        ("Networking Lounge", "Connect with other members. Introductions, collaborations, and relationship building.", "space-networking-lounge.png"),
+        ("Investment Club", "Deal sharing, market analysis, crypto, real estate, and alternative investments.", "space-investment-club.png"),
+        ("Wellness & Health", "Optimize body and mind. Peptides, HRT, breathwork, meditation, fitness, longevity.", "space-wellness-health.png"),
+        ("Creator's Corner", "Content creation, brand building, social media strategy, digital media production.", "space-creators-corner.png"),
+    ]
+    created = 0
+    for name, desc, img in spaces_data:
+        if not Space.query.filter_by(name=name).first():
+            db.session.add(Space(name=name, description=desc, cover_image=img, created_by=admin.id))
+            created += 1
+    events_data = [
+        ("Weekly Mastermind Call", "Weekly group call - wins, challenges, hot seat format.", 3, "7:00 PM EST", "Zoom"),
+        ("Monthly Networking Mixer", "In-person networking in St. Pete. Drinks provided.", 14, "6:30 PM EST", "St. Petersburg, FL"),
+        ("Guest Speaker: AI Automation", "Leveraging AI agents for business automation. Live demo.", 7, "8:00 PM EST", "Zoom"),
+        ("Deal Flow Friday", "Members present investment opportunities. Pitch format with Q&A.", 5, "12:00 PM EST", "Zoom"),
+        ("Wellness Workshop: Peptides", "Deep dive into peptide therapy and longevity protocols.", 10, "7:30 PM EST", "Zoom"),
+    ]
+    ev_created = 0
+    for title, desc, days, t, loc in events_data:
+        if not Event.query.filter_by(title=title).first():
+            db.session.add(Event(title=title, description=desc, date=(datetime.utcnow() + timedelta(days=days)).date(), time=t, location=loc, host_id=admin.id))
+            ev_created += 1
+    db.session.commit()
+    return f"Seeded {created} spaces and {ev_created} events."
+
 # --- One-time reset (remove after use) ---
 @app.route("/reset-pwd/<secret>")
 def reset_pwd(secret):
