@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ deal.title }}{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <a href="{{ url_for('features.deals') }}" class="back-link">&larr; Back to Deals</a>
+    <div class="card" style="margin-top:1rem">
+        {% if deal.image_path %}
+        <div class="deal-detail-img">
+            <img src="{{ url_for('static', filename=deal.image_path) }}" alt="">
+        </div>
+        {% endif %}
+        <span class="deal-category">{{ deal.category|capitalize }}</span>
+        <h1 style="margin:0.5rem 0">{{ deal.title }}</h1>
+        <div class="post-header" style="margin-bottom:1rem">
+            <a href="{{ url_for('profile', user_id=deal.author.id) }}" class="post-author">
+                <div class="avatar avatar-sm">
+                    {% if deal.author.profile_photo %}
+                    <img src="{{ url_for('static', filename=deal.author.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ deal.author.name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="author-info">
+                    <strong>{{ deal.author.name }}</strong>
+                    <span class="post-time">{{ deal.time_ago }}</span>
+                </div>
+            </a>
+        </div>
+        <p style="line-height:1.7;color:var(--text-secondary)">{{ deal.description }}</p>
+        {% if deal.link %}
+        <a href="{{ deal.link }}" target="_blank" class="btn btn-ghost" style="margin-top:1rem">Visit Link</a>
+        {% endif %}
+        <div style="margin-top:1.5rem;display:flex;align-items:center;gap:1rem">
+            <button class="btn {% if deal.user_interested(current_user) %}btn-gold{% else %}btn-ghost{% endif %}" id="interestBtn" onclick="toggleInterest({{ deal.id }})">
+                {% if deal.user_interested(current_user) %}Interested{% else %}Show Interest{% endif %}
+            </button>
+            <span id="interestCount">{{ deal.interest_count }} interested</span>
+        </div>
+        {% if deal.interests|length > 0 %}
+        <div style="margin-top:1.5rem">
+            <h3 style="margin-bottom:0.75rem">Interested Members</h3>
+            {% for interest in deal.interests %}
+            <div class="convo-card" style="margin-bottom:0.5rem">
+                <div class="avatar avatar-sm">
+                    {% if interest.user.profile_photo %}
+                    <img src="{{ url_for('static', filename=interest.user.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ interest.user.name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <strong>{{ interest.user.name }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleInterest(dealId) {
+    fetch(`/deals/${dealId}/interest`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const btn = document.getElementById('interestBtn');
+            btn.textContent = data.interested ? 'Interested' : 'Show Interest';
+            btn.className = data.interested ? 'btn btn-gold' : 'btn btn-ghost';
+            document.getElementById('interestCount').textContent = data.count + ' interested';
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Membership{% endblock %}
+
+{% block content %}
+<style>
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+}
+.shake { animation: shake 0.4s ease; }
+
+#code-toggle:hover { text-decoration: underline; }
+
+#code-section {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+#code-section.active {
+    max-height: 200px;
+}
+</style>
+
+<div class="pricing-container">
+    <div class="pricing-header">
+        <h1>Unlock the Full Experience</h1>
+        <p class="pricing-subtitle">Join the inner circle. Get access to everything the Anti Billionaires Men's Club has to offer.</p>
+    </div>
+
+    {% if current_user.is_authenticated and current_user.has_active_subscription %}
+    <div class="pricing-active-card">
+        <div class="pricing-active-badge">ACTIVE MEMBER</div>
+        <h2>You're in the inner circle</h2>
+        <p>Your membership is active. You have full access to all features.</p>
+        <form method="POST" action="{{ url_for('billing_portal') }}" style="margin-top:1.5rem">
+            <button type="submit" class="btn btn-outline">Manage Billing</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="pricing-card">
+        <div class="pricing-card-glow"></div>
+        <div class="pricing-card-inner">
+            <div class="pricing-tier">BROTHERHOOD MEMBERSHIP</div>
+            <div class="pricing-amount">
+                <span class="pricing-dollar">$</span>
+                <span class="pricing-number">100</span>
+                <span class="pricing-period">/month</span>
+            </div>
+            <div class="pricing-tagline">Build wealth. Build character. Build together.</div>
+
+            <div class="form-group" style="margin: 1.5rem 0 1rem;">
+                <input type="email" id="pricing-email" placeholder="Enter your email" class="form-control" style="width:100%;padding:14px 16px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#fff;font-size:1rem;text-align:center;" required>
+            </div>
+
+            <ul class="pricing-features">
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Full access to all Spaces
+                </li>
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    The Vault - exclusive courses & lessons
+                </li>
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Live events & group trainings
+                </li>
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Private community feed & networking
+                </li>
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Leaderboard & achievement system
+                </li>
+                <li>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Direct access to mentors & leaders
+                </li>
+            </ul>
+
+            <button class="btn btn-gold btn-full btn-lg" id="checkout-btn">
+                Join the Brotherhood
+            </button>
+
+            <div style="text-align:center;margin-top:0.75rem;">
+                <a href="#" id="code-toggle" style="color:#666;font-size:0.85rem;text-decoration:none;">Have a code?</a>
+            </div>
+
+            <div id="code-section">
+                <div style="display:flex;gap:8px;margin-top:0.75rem;">
+                    <input type="text" id="coupon-code" placeholder="Enter code" style="flex:1;padding:10px 14px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#fff;font-size:0.9rem;">
+                    <button id="apply-code-btn" class="btn btn-outline" style="white-space:nowrap;">Apply</button>
+                </div>
+                <div id="code-error" style="display:none;color:#e74c3c;font-size:0.85rem;margin-top:0.5rem;text-align:center;">Invalid code</div>
+            </div>
+
+            <input type="hidden" id="founder-mode" value="false">
+
+            <p class="pricing-note">Cancel anytime. No contracts. No BS.</p>
+        </div>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem;">
+        <p style="color:#888;font-size:0.9rem;">Already a member? <a href="{{ url_for('login') }}" style="color:#D4AF37;">Sign in</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// "Have a code?" toggle
+document.getElementById('code-toggle').addEventListener('click', function(e) {
+    e.preventDefault();
+    const codeSection = document.getElementById('code-section');
+    codeSection.classList.toggle('active');
+});
+
+// Validate code
+document.getElementById('apply-code-btn').addEventListener('click', async function() {
+    const code = document.getElementById('coupon-code').value;
+    if (!code) return;
+    const res = await fetch('/validate-code', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({code: code})
+    });
+    const data = await res.json();
+    if (data.valid) {
+        this.textContent = '\u2713 Code applied';
+        this.style.color = '#D4AF37';
+        this.style.borderColor = '#D4AF37';
+        document.getElementById('founder-mode').value = 'true';
+        // Update main CTA
+        const btn = document.getElementById('checkout-btn');
+        btn.dataset.founder = 'true';
+        btn.textContent = '\u2713 Code applied \u2014 free access';
+        btn.style.background = 'linear-gradient(135deg, #D4AF37, #B8941F)';
+    } else {
+        // Shake animation
+        const input = document.getElementById('coupon-code');
+        input.classList.add('shake');
+        setTimeout(() => input.classList.remove('shake'), 600);
+        document.getElementById('code-error').style.display = 'block';
+        setTimeout(() => document.getElementById('code-error').style.display = 'none', 3000);
+    }
+});
+
+// Main CTA
+document.getElementById('checkout-btn').addEventListener('click', async function() {
+    const email = document.getElementById('pricing-email').value.trim();
+    if (!email) {
+        alert('Please enter your email address.');
+        document.getElementById('pricing-email').focus();
+        return;
+    }
+
+    if (this.dataset.founder === 'true') {
+        window.location.href = '/signup?founder=true&email=' + encodeURIComponent(email);
+        return;
+    }
+
+    // Regular Stripe checkout - check if Stripe is configured first
+    this.disabled = true;
+    this.textContent = 'Loading...';
+    try {
+        const res = await fetch('/create-checkout-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email: email})
+        });
+        const data = await res.json();
+        if (data.checkout_url) {
+            window.location.href = data.checkout_url;
+        } else if (data.error && data.error.includes('not configured')) {
+            alert('Payment is not set up yet. Use a founder code below to join for free.');
+            // Auto-open the code section
+            document.getElementById('code-section').classList.add('active');
+            document.getElementById('coupon-code').focus();
+            this.textContent = 'Join the Brotherhood';
+            this.disabled = false;
+        } else {
+            alert('Payment is not set up yet. Use a founder code to join.');
+            document.getElementById('code-section').classList.add('active');
+            this.textContent = 'Join the Brotherhood';
+            this.disabled = false;
+        }
+    } catch(err) {
+        alert('Payment is not set up yet. Click "Have a code?" below and enter your founder code.');
+        document.getElementById('code-section').classList.add('active');
+        this.textContent = 'Join the Brotherhood';
+        this.disabled = false;
+    }
+});
+
+// Allow Enter key on email field
+document.getElementById('pricing-email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('checkout-btn').click();
+    }
+});
+</script>
+{% endblock %}

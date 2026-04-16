@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}The Boardroom{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1 style="color:var(--gold)">The Boardroom</h1>
+        <span class="header-subtitle">Exclusive to Platinum members & Level 9+</span>
+    </div>
+
+    <div class="boardroom-layout">
+        <div class="boardroom-main">
+            <div class="card" style="border:1px solid var(--gold);margin-bottom:1.5rem">
+                <h3>Welcome to the inner sanctum</h3>
+                <p style="color:var(--text-secondary)">This is where the heaviest hitters in the club connect. Share high-level strategy, mastermind on deals, and build together.</p>
+            </div>
+
+            {% for post in posts %}
+            <div class="post-card">
+                <div class="post-header">
+                    <a href="{{ url_for('profile', user_id=post.author.id) }}" class="post-author">
+                        <div class="avatar avatar-sm">
+                            {% if post.author.profile_photo %}
+                            <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                            {% else %}
+                            <span>{{ post.author.name[0]|upper }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="author-info">
+                            <strong>{{ post.author.name }}</strong>
+                            <span class="tier-badge tier-{{ post.author.tier }}">{{ post.author.tier_display }}</span>
+                        </div>
+                    </a>
+                </div>
+                <p>{{ post.content }}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="boardroom-sidebar">
+            <div class="card">
+                <h3 style="margin-bottom:0.75rem">Elite Members</h3>
+                {% for m in members[:10] %}
+                <div class="convo-card" style="margin-bottom:0.5rem">
+                    <div class="avatar avatar-xs">
+                        {% if m.profile_photo %}
+                        <img src="{{ url_for('static', filename=m.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ m.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <strong style="font-size:0.85rem">{{ m.name }}</strong>
+                        <span class="tier-badge tier-{{ m.tier }}" style="font-size:0.7rem">{{ m.tier_display }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Member Map{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Member Map</h1>
+        <span class="header-subtitle">Find brothers around the world</span>
+    </div>
+
+    <div id="memberMap" style="width:100%;height:500px;border-radius:var(--radius);overflow:hidden;background:var(--surface)"></div>
+
+    <div class="card" style="margin-top:1.5rem">
+        <h3 style="margin-bottom:0.75rem">Update Your Location</h3>
+        <form method="POST" action="{{ url_for('features.update_location') }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>City</label>
+                    <input type="text" name="city" class="input-field" value="{{ current_user.city or '' }}" placeholder="e.g. Miami">
+                </div>
+                <div class="form-group">
+                    <label>Country</label>
+                    <input type="text" name="country" class="input-field" value="{{ current_user.country or '' }}" placeholder="e.g. USA">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="text" name="lat" class="input-field" value="{{ current_user.lat or '' }}" placeholder="25.7617" id="latInput">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="text" name="lng" class="input-field" value="{{ current_user.lng or '' }}" placeholder="-80.1918" id="lngInput">
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;margin:0.75rem 0">
+                <input type="checkbox" name="show_on_map" id="showMap" {% if current_user.show_on_map %}checked{% endif %}>
+                <label for="showMap">Show me on the map</label>
+            </div>
+            <div style="display:flex;gap:0.5rem">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="detectLocation()">Detect My Location</button>
+                <button type="submit" class="btn btn-gold btn-sm">Save Location</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const markers = {{ markers|tojson }};
+const map = L.map('memberMap').setView([30, 0], 2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CartoDB',
+    maxZoom: 18
+}).addTo(map);
+
+const goldIcon = L.divIcon({
+    className: 'map-marker',
+    html: '<div style="width:12px;height:12px;background:#D4AF37;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(212,175,55,0.6)"></div>',
+    iconSize: [16, 16]
+});
+
+markers.forEach(m => {
+    const marker = L.marker([m.lat, m.lng], {icon: goldIcon}).addTo(map);
+    marker.bindPopup(`<strong style="color:#000">${m.name}</strong><br><span style="color:#666">${m.city}${m.city && m.country ? ', ' : ''}${m.country}</span><br><span style="color:#B8941F">${m.tier}</span>`);
+});
+
+function detectLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            document.getElementById('latInput').value = pos.coords.latitude.toFixed(4);
+            document.getElementById('lngInput').value = pos.coords.longitude.toFixed(4);
+        });
+    }
+}
+</script>
+{% endblock %}

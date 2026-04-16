@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}{{ space.name }} - Chat{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <a href="{{ url_for('space_detail', space_id=space.id) }}" class="chat-back">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </a>
+        <div>
+            <strong>{{ space.name }}</strong>
+            <span class="header-subtitle" style="font-size:0.8rem">{{ space.member_count }} members</span>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        {% for msg in messages %}
+        <div class="chat-msg {% if msg.user_id == current_user.id %}sent{% else %}received{% endif %}" data-msg-id="{{ msg.id }}">
+            {% if msg.user_id != current_user.id %}
+            <span class="chat-sender-name">{{ msg.author.name }}</span>
+            {% endif %}
+            <div class="chat-bubble">{{ msg.content }}</div>
+            <span class="chat-time">{{ msg.time_ago }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-input-bar" id="chatForm" onsubmit="sendSpaceChat(event)">
+        <input type="text" id="chatInput" placeholder="Message {{ space.name }}..." autocomplete="off" required>
+        <button type="submit" class="btn btn-gold btn-sm">Send</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const spaceId = {{ space.id }};
+let lastMsgId = 0;
+document.querySelectorAll('.chat-msg').forEach(el => {
+    const id = parseInt(el.dataset.msgId);
+    if (id > lastMsgId) lastMsgId = id;
+});
+const chatBox = document.getElementById('chatMessages');
+chatBox.scrollTop = chatBox.scrollHeight;
+
+function sendSpaceChat(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+    fetch(`/space/${spaceId}/chat/send`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: content})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            appendSpaceMsg(data.message, true);
+            lastMsgId = data.message.id;
+        }
+    });
+}
+
+function appendSpaceMsg(msg, isSent) {
+    const div = document.createElement('div');
+    div.className = `chat-msg ${isSent ? 'sent' : 'received'}`;
+    div.dataset.msgId = msg.id;
+    let html = '';
+    if (!isSent) html += `<span class="chat-sender-name">${msg.sender_name}</span>`;
+    html += `<div class="chat-bubble">${escapeHtml(msg.content)}</div><span class="chat-time">${msg.time_ago}</span>`;
+    div.innerHTML = html;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+setInterval(() => {
+    fetch(`/space/${spaceId}/chat/poll?after=${lastMsgId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.messages.length > 0) {
+                data.messages.forEach(msg => {
+                    if (msg.id > lastMsgId) {
+                        appendSpaceMsg(msg, msg.sender_id === {{ current_user.id }});
+                        lastMsgId = msg.id;
+                    }
+                });
+            }
+        });
+}, 5000);
+</script>
+{% endblock %}

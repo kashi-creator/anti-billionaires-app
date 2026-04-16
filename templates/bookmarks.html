@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}My Bookmarks{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>My Bookmarks</h1>
+        <span class="header-subtitle">Posts you've saved for later</span>
+    </div>
+
+    <div class="posts-list">
+        {% for bm in bookmarks %}
+        {% set post = bm.post %}
+        <div class="post-card" id="post-{{ post.id }}">
+            <div class="post-header">
+                <a href="{{ url_for('profile', user_id=post.author.id) }}" class="post-author">
+                    <div class="avatar avatar-sm">
+                        {% if post.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ post.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="author-info">
+                        <strong>{{ post.author.name }}</strong>
+                        <span class="post-time">{{ post.time_ago }}</span>
+                    </div>
+                </a>
+                <button class="action-btn liked" onclick="toggleBookmark({{ post.id }}, this)" title="Remove bookmark">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                </button>
+            </div>
+            <div class="post-content">
+                <p>{{ post.content }}</p>
+                {% if post.image_path %}
+                <div class="post-image">
+                    <img src="{{ url_for('static', filename=post.image_path) }}" alt="" loading="lazy">
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+            <h3>No bookmarks yet</h3>
+            <p>Save posts from the feed to read them later.</p>
+            <a href="{{ url_for('feed') }}" class="btn btn-gold btn-sm" style="margin-top:1rem">Go to Feed</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleBookmark(postId, btn) {
+    fetch(`/bookmark/${postId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && !data.bookmarked) {
+                const card = btn.closest('.post-card');
+                card.style.opacity = '0';
+                setTimeout(() => card.remove(), 300);
+            }
+        });
+}
+</script>
+{% endblock %}

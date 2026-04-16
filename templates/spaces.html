@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Spaces{% endblock %}
+
+{% block content %}
+<div class="members-container">
+    <div class="feed-header">
+        <h1>Spaces</h1>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('create_space') }}" class="btn btn-gold btn-sm">+ Create Space</a>
+        {% endif %}
+    </div>
+
+    <div class="spaces-grid">
+        {% for space in spaces %}
+        <a href="{{ url_for('space_detail', space_id=space.id) }}" class="space-card">
+            <div class="space-cover" {% if space.cover_image %}style="background-image: url('{{ url_for('static', filename=space.cover_image) }}')"{% endif %}>
+                {% if not space.cover_image %}
+                <div class="space-cover-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                </div>
+                {% endif %}
+            </div>
+            <div class="space-card-body">
+                <h3>{{ space.name }}</h3>
+                {% if space.description %}
+                <p class="space-desc">{{ space.description[:100] }}{% if space.description|length > 100 %}...{% endif %}</p>
+                {% endif %}
+                <div class="space-meta">
+                    <span>{{ space.member_count }} member{{ 's' if space.member_count != 1 }}</span>
+                    {% if space.is_member(current_user) %}
+                    <span class="space-joined-badge">Joined</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+        {% else %}
+        <div class="empty-state" style="grid-column: 1/-1">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <h3>No spaces yet</h3>
+            <p>Spaces are coming soon.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

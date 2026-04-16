@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Resource Vault{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Resource Vault</h1>
+        <a href="{{ url_for('features.create_resource') }}" class="btn btn-gold btn-sm">Share Resource</a>
+    </div>
+
+    <div class="feed-filters" style="margin-bottom:1.5rem">
+        <a href="{{ url_for('features.resources', category='all') }}" class="filter-btn {% if selected_cat == 'all' %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="{{ url_for('features.resources', category=cat) }}" class="filter-btn {% if selected_cat == cat %}active{% endif %}">{{ cat|capitalize }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="resources-grid">
+        {% for res in resources %}
+        <div class="card resource-card">
+            <span class="deal-category">{{ res.category|capitalize }}</span>
+            <h3>{{ res.title }}</h3>
+            <p>{{ res.description[:120] }}{% if res.description|length > 120 %}...{% endif %}</p>
+            <div class="resource-footer">
+                <span class="resource-by">By {{ res.author.name }}</span>
+                {% if res.url %}
+                <a href="{{ res.url }}" target="_blank" class="btn btn-ghost btn-xs">Visit</a>
+                {% endif %}
+                <button class="action-btn {% if res.upvoted_by(current_user) %}liked{% endif %}" onclick="upvoteResource({{ res.id }}, this)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="{% if res.upvoted_by(current_user) %}#D4AF37{% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+                    <span class="upvote-count">{{ res.upvote_count }}</span>
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            <h3>No resources yet</h3>
+            <p>Share a book, tool, or course that helped you level up.</p>
+            <a href="{{ url_for('features.create_resource') }}" class="btn btn-gold btn-sm" style="margin-top:1rem">Share Resource</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function upvoteResource(resId, btn) {
+    fetch(`/resources/${resId}/upvote`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (data.upvoted) {
+                    btn.classList.add('liked');
+                    btn.querySelector('svg').setAttribute('fill', '#D4AF37');
+                } else {
+                    btn.classList.remove('liked');
+                    btn.querySelector('svg').setAttribute('fill', 'none');
+                }
+                btn.querySelector('.upvote-count').textContent = data.count;
+            }
+        });
+}
+</script>
+{% endblock %}

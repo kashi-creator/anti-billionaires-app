@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Post Reel{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <h1>Post a Reel</h1>
+    <form method="POST" class="form-card">
+        <div class="form-group">
+            <label>Video URL (YouTube or Vimeo)</label>
+            <input type="url" name="video_url" class="input-field" required placeholder="https://youtube.com/watch?v=...">
+        </div>
+        <div class="form-group">
+            <label>Title (optional)</label>
+            <input type="text" name="title" class="input-field" placeholder="Give it a title...">
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%">Post Reel</button>
+    </form>
+</div>
+{% endblock %}

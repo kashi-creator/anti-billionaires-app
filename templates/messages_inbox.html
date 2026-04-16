@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Messages</h1>
+        <span class="header-subtitle">Direct conversations with the brotherhood</span>
+    </div>
+
+    <div class="conversations-list">
+        {% for convo in conversations %}
+        {% set other = convo.other_user(current_user) %}
+        {% set last = convo.last_message %}
+        {% set unread = convo.unread_count_for(current_user) %}
+        <a href="{{ url_for('features.chat', convo_id=convo.id) }}" class="convo-card {% if unread > 0 %}unread{% endif %}">
+            <div class="avatar avatar-md">
+                {% if other.profile_photo %}
+                <img src="{{ url_for('static', filename=other.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ other.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="convo-info">
+                <div class="convo-top">
+                    <strong>{{ other.name }}</strong>
+                    {% if last %}
+                    <span class="convo-time">{{ last.time_ago }}</span>
+                    {% endif %}
+                </div>
+                <div class="convo-preview">
+                    {% if last %}
+                    {{ last.content[:60] }}{% if last.content|length > 60 %}...{% endif %}
+                    {% else %}
+                    <em>No messages yet</em>
+                    {% endif %}
+                </div>
+            </div>
+            {% if unread > 0 %}
+            <span class="convo-unread-badge">{{ unread }}</span>
+            {% endif %}
+        </a>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <h3>No messages yet</h3>
+            <p>Visit a member's profile and start a conversation.</p>
+            <a href="{{ url_for('members') }}" class="btn btn-gold btn-sm" style="margin-top:1rem">Browse Members</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

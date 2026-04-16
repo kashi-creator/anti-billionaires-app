@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Share Resource{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <h1>Share a Resource</h1>
+    <form method="POST" class="form-card">
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" name="title" class="input-field" required placeholder="e.g. The 4-Hour Workweek">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" class="input-field" rows="3" placeholder="Why is this valuable?"></textarea>
+        </div>
+        <div class="form-group">
+            <label>URL (optional)</label>
+            <input type="url" name="url" class="input-field" placeholder="https://...">
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select name="category" class="input-field">
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat|capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%">Share Resource</button>
+    </form>
+</div>
+{% endblock %}

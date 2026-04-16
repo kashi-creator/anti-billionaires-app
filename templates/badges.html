@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Badges & Achievements{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Badges & Achievements</h1>
+        <span class="header-subtitle">Your journey to the top</span>
+    </div>
+
+    <div class="badges-grid">
+        {% for badge in badges %}
+        {% set earned = badge.id in user_badge_ids %}
+        <div class="badge-card {% if earned %}earned{% else %}locked{% endif %}">
+            <div class="badge-icon">
+                {% if earned %}
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                {% else %}
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                {% endif %}
+            </div>
+            <h3>{{ badge.name }}</h3>
+            <p>{{ badge.description }}</p>
+            {% if badge.points_required > 0 %}
+            <span class="badge-req">{{ badge.points_required }} pts required</span>
+            {% endif %}
+            {% if earned %}
+            <span class="badge-earned-tag">EARNED</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

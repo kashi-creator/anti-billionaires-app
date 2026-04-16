@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<div class="feed-container">
+    <div class="feed-header">
+        <h1>Leaderboard</h1>
+        {% if my_rank %}
+        <span class="member-badge">Your rank: #{{ my_rank }}</span>
+        {% endif %}
+    </div>
+
+    <div class="leaderboard-list">
+        {% for user in top_users %}
+        <a href="{{ url_for('profile', user_id=user.id) }}" class="leaderboard-row {% if loop.index <= 3 %}top-three{% endif %}">
+            <div class="lb-rank">
+                {% if loop.index == 1 %}
+                <span class="rank-badge gold">1</span>
+                {% elif loop.index == 2 %}
+                <span class="rank-badge silver">2</span>
+                {% elif loop.index == 3 %}
+                <span class="rank-badge bronze">3</span>
+                {% else %}
+                <span class="rank-number">{{ loop.index }}</span>
+                {% endif %}
+            </div>
+            <div class="avatar avatar-sm">
+                {% if user.profile_photo %}
+                <img src="{{ url_for('static', filename=user.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ user.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="lb-info">
+                <strong>{{ user.name }}</strong>
+                <span class="lb-streak">
+                    {% if user.streak_days and user.streak_days > 1 %}{{ user.streak_days }} day streak{% endif %}
+                </span>
+            </div>
+            <div class="lb-points">{{ user.points or 0 }} pts</div>
+        </a>
+        {% else %}
+        <div class="empty-state">
+            <h3>No members yet</h3>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="points-legend">
+        <h3>How to earn points</h3>
+        <div class="legend-grid">
+            <div class="legend-item"><span class="legend-pts">+10</span> Create a post</div>
+            <div class="legend-item"><span class="legend-pts">+5</span> Write a comment</div>
+            <div class="legend-item"><span class="legend-pts">+2</span> Receive a like</div>
+            <div class="legend-item"><span class="legend-pts">+5</span> Daily login streak</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

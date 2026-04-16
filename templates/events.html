@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Events{% endblock %}
+
+{% block content %}
+<div class="events-container">
+    <div class="feed-header">
+        <h1>Events & Trainings</h1>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('phase3.create_event') }}" class="btn btn-gold btn-sm">+ Create Event</a>
+        {% endif %}
+    </div>
+
+    <!-- Upcoming Events -->
+    {% if upcoming %}
+    <div class="section-label">Upcoming</div>
+    <div class="events-grid">
+        {% for event in upcoming %}
+        <a href="{{ url_for('phase3.event_detail', event_id=event.id) }}" class="event-card">
+            {% if event.cover_image %}
+            <div class="event-cover">
+                <img src="{{ url_for('static', filename=event.cover_image) }}" alt="">
+            </div>
+            {% else %}
+            <div class="event-cover event-cover-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            {% endif %}
+            <div class="event-card-body">
+                <div class="event-date-badge">
+                    <span class="edb-month">{{ event.date.strftime('%b') }}</span>
+                    <span class="edb-day">{{ event.date.strftime('%d') }}</span>
+                </div>
+                <div class="event-info">
+                    <h3>{{ event.title }}</h3>
+                    {% if event.time %}<span class="event-meta-line">{{ event.time }}</span>{% endif %}
+                    {% if event.location %}<span class="event-meta-line">{{ event.location }}</span>{% endif %}
+                    <div class="event-rsvp-counts">
+                        <span>{{ event.going_count }} Going</span>
+                        <span class="meta-dot"></span>
+                        <span>{{ event.interested_count }} Interested</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <h3>No upcoming events</h3>
+        <p>Check back soon for new events and live trainings.</p>
+    </div>
+    {% endif %}
+
+    <!-- Past Events -->
+    {% if past %}
+    <div class="section-label" style="margin-top: 2rem;">Past Events</div>
+    <div class="events-grid past-events">
+        {% for event in past %}
+        <a href="{{ url_for('phase3.event_detail', event_id=event.id) }}" class="event-card event-card-past">
+            <div class="event-card-body">
+                <div class="event-date-badge">
+                    <span class="edb-month">{{ event.date.strftime('%b') }}</span>
+                    <span class="edb-day">{{ event.date.strftime('%d') }}</span>
+                </div>
+                <div class="event-info">
+                    <h3>{{ event.title }}</h3>
+                    <div class="event-rsvp-counts">
+                        <span>{{ event.going_count }} Attended</span>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

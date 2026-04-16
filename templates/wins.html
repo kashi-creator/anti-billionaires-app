@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Wins Wall{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Wins Wall</h1>
+        <span class="header-subtitle">Celebrate victories with the brotherhood</span>
+    </div>
+
+    <!-- Post a Win -->
+    <div class="card" style="margin-bottom:1.5rem">
+        <form method="POST" action="{{ url_for('features.create_win') }}" enctype="multipart/form-data">
+            <h3 style="margin-bottom:0.75rem;color:var(--gold)">Share a Win</h3>
+            <input type="text" name="title" placeholder="What's your win?" class="input-field" required>
+            <textarea name="description" placeholder="Tell us more..." class="input-field" rows="2" style="margin-top:0.5rem"></textarea>
+            <div class="composer-bottom" style="margin-top:0.5rem">
+                <label class="composer-upload" for="winImage">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Photo
+                </label>
+                <input type="file" id="winImage" name="image" accept="image/*" hidden>
+                <button type="submit" class="btn btn-gold btn-sm">Post Win</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Wins List -->
+    <div class="wins-grid">
+        {% for win in wins %}
+        <div class="card win-card">
+            <div class="post-header">
+                <a href="{{ url_for('profile', user_id=win.author.id) }}" class="post-author">
+                    <div class="avatar avatar-sm">
+                        {% if win.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=win.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ win.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="author-info">
+                        <strong>{{ win.author.name }}</strong>
+                        <span class="post-time">{{ win.time_ago }}</span>
+                    </div>
+                </a>
+            </div>
+            <h3 class="win-title">{{ win.title }}</h3>
+            {% if win.description %}
+            <p class="win-desc">{{ win.description }}</p>
+            {% endif %}
+            {% if win.image_path %}
+            <div class="post-image">
+                <img src="{{ url_for('static', filename=win.image_path) }}" alt="Win">
+            </div>
+            {% endif %}
+            <div class="win-reactions" data-win-id="{{ win.id }}">
+                {% set counts = win.reaction_counts() %}
+                {% for emoji in ['fire', 'muscle', 'crown', 'clap', 'rocket'] %}
+                {% set emoji_char = {'fire':'🔥','muscle':'💪','crown':'👑','clap':'👏','rocket':'🚀'}[emoji] %}
+                <button class="reaction-btn {% if win.user_reacted(current_user, emoji) %}active{% endif %}" onclick="reactWin({{ win.id }}, '{{ emoji }}', this)">
+                    {{ emoji_char }} <span class="reaction-count">{{ counts.get(emoji, 0) or '' }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M6 9H4.5a2.5 2.5 0 010-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 000-5C17 4 17 7 17 7"/><path d="M18 2H6v7a6 6 0 0012 0V2Z"/></svg>
+            <h3>No wins shared yet</h3>
+            <p>Be the first to celebrate a victory with the club.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function reactWin(winId, emoji, btn) {
+    fetch(`/wins/${winId}/react`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({emoji: emoji})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            btn.classList.toggle('active');
+            const countEl = btn.querySelector('.reaction-count');
+            const count = data.counts[emoji] || 0;
+            countEl.textContent = count > 0 ? count : '';
+        }
+    });
+}
+</script>
+{% endblock %}

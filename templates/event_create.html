@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Create Event{% endblock %}
+
+{% block content %}
+<div class="form-page-container">
+    <a href="{{ url_for('phase3.events') }}" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Events
+    </a>
+
+    <div class="form-card">
+        <h1>Create Event</h1>
+        <form method="POST" enctype="multipart/form-data" class="auth-form" style="margin-top:1.5rem;">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" name="title" placeholder="Event title" required>
+            </div>
+            <div class="form-group">
+                <label>Description <span class="optional">(optional)</span></label>
+                <textarea name="description" rows="4" placeholder="What's this event about?"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="date" required>
+                </div>
+                <div class="form-group">
+                    <label>Time <span class="optional">(optional)</span></label>
+                    <input type="text" name="time" placeholder="e.g. 7:00 PM EST">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Location <span class="optional">(optional)</span></label>
+                <input type="text" name="location" placeholder="Zoom link, address, etc.">
+            </div>
+            <div class="form-group">
+                <label>Max Attendees <span class="optional">(optional)</span></label>
+                <input type="number" name="max_attendees" placeholder="Leave blank for unlimited" min="1">
+            </div>
+            <div class="form-group">
+                <label>Cover Image <span class="optional">(optional)</span></label>
+                <label class="file-upload" for="coverImage">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Choose image
+                </label>
+                <input type="file" id="coverImage" name="cover_image" accept="image/*" hidden>
+            </div>
+            <button type="submit" class="btn btn-gold btn-full">Create Event</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

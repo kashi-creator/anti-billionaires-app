@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Create Challenge{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <h1>Create Weekly Challenge</h1>
+    <form method="POST" class="form-card">
+        <div class="form-group">
+            <label>Challenge Title</label>
+            <input type="text" name="title" class="input-field" required placeholder="e.g. Cold Outreach Sprint">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" class="input-field" rows="4" placeholder="What should members do?"></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" name="start_date" class="input-field" required>
+            </div>
+            <div class="form-group">
+                <label>End Date</label>
+                <input type="date" name="end_date" class="input-field" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Points Reward</label>
+            <input type="number" name="points_reward" class="input-field" value="50" min="1">
+        </div>
+        <button type="submit" class="btn btn-gold" style="width:100%">Create Challenge</button>
+    </form>
+</div>
+{% endblock %}

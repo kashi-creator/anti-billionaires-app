@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Lessons{% endblock %}
+
+{% block content %}
+<div class="lessons-container">
+    <div class="feed-header">
+        <h1>Courses & Lessons</h1>
+    </div>
+
+    {% if courses %}
+    <div class="courses-grid">
+        {% for course in courses %}
+        <div class="course-card">
+            {% if course.cover_image %}
+            <div class="course-cover">
+                <img src="{{ url_for('static', filename=course.cover_image) }}" alt="">
+            </div>
+            {% else %}
+            <div class="course-cover course-cover-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            </div>
+            {% endif %}
+            <div class="course-card-body">
+                <h3>{{ course.title }}</h3>
+                {% if course.description %}
+                <p class="course-desc">{{ course.description[:120] }}{% if course.description|length > 120 %}...{% endif %}</p>
+                {% endif %}
+
+                <!-- Progress bar -->
+                {% set completed, total = course.progress_for(current_user) %}
+                {% set pct = course.progress_pct(current_user) %}
+                <div class="progress-section">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" style="width: {{ pct }}%"></div>
+                    </div>
+                    <span class="progress-label">{{ completed }}/{{ total }} lessons{% if pct == 100 %} &#10003;{% endif %}</span>
+                </div>
+
+                <!-- Lesson list -->
+                <div class="lesson-list">
+                    {% for lesson in course.lessons %}
+                    <a href="{{ url_for('phase3.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}" class="lesson-row {% if lesson.is_completed_by(current_user) %}lesson-completed{% endif %}">
+                        <span class="lesson-check">
+                            {% if lesson.is_completed_by(current_user) %}
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            {% else %}
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+                            {% endif %}
+                        </span>
+                        <span class="lesson-title">{{ lesson.title }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+        <h3>No courses yet</h3>
+        <p>Courses and lessons will appear here when they're available.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

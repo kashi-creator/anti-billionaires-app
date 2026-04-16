@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Chat with {{ other_user.name }}{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <a href="{{ url_for('features.inbox') }}" class="chat-back">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </a>
+        <a href="{{ url_for('profile', user_id=other_user.id) }}" class="chat-user-info">
+            <div class="avatar avatar-sm">
+                {% if other_user.profile_photo %}
+                <img src="{{ url_for('static', filename=other_user.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ other_user.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>{{ other_user.name }}</strong>
+                <span class="tier-badge tier-{{ other_user.tier }}">{{ other_user.tier_display }}</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        {% for msg in conversation.messages %}
+        <div class="chat-msg {% if msg.sender_id == current_user.id %}sent{% else %}received{% endif %}" data-msg-id="{{ msg.id }}">
+            <div class="chat-bubble">
+                {{ msg.content }}
+            </div>
+            <span class="chat-time">{{ msg.time_ago }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-input-bar" id="chatForm" onsubmit="sendChatMessage(event)">
+        <input type="text" id="chatInput" placeholder="Type a message..." autocomplete="off" required>
+        <button type="submit" class="btn btn-gold btn-sm">Send</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const convoId = {{ conversation.id }};
+let lastMsgId = 0;
+
+// Find last message id
+document.querySelectorAll('.chat-msg').forEach(el => {
+    const id = parseInt(el.dataset.msgId);
+    if (id > lastMsgId) lastMsgId = id;
+});
+
+// Scroll to bottom
+const chatBox = document.getElementById('chatMessages');
+chatBox.scrollTop = chatBox.scrollHeight;
+
+function sendChatMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+
+    fetch(`/messages/${convoId}/send`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: content})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            appendMessage(data.message, true);
+            lastMsgId = data.message.id;
+        }
+    });
+}
+
+function appendMessage(msg, isSent) {
+    const div = document.createElement('div');
+    div.className = `chat-msg ${isSent ? 'sent' : 'received'}`;
+    div.dataset.msgId = msg.id;
+    div.innerHTML = `<div class="chat-bubble">${escapeHtml(msg.content)}</div><span class="chat-time">${msg.time_ago}</span>`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Poll for new messages
+setInterval(() => {
+    fetch(`/messages/${convoId}/poll?after=${lastMsgId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.messages.length > 0) {
+                data.messages.forEach(msg => {
+                    if (msg.id > lastMsgId) {
+                        appendMessage(msg, msg.sender_id === {{ current_user.id }});
+                        lastMsgId = msg.id;
+                    }
+                });
+            }
+        });
+}, 5000);
+</script>
+{% endblock %}

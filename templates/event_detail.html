@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="event-detail-container">
+    <a href="{{ url_for('phase3.events') }}" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Events
+    </a>
+
+    {% if event.cover_image %}
+    <div class="event-detail-cover">
+        <img src="{{ url_for('static', filename=event.cover_image) }}" alt="">
+    </div>
+    {% endif %}
+
+    <div class="event-detail-card">
+        <div class="event-detail-header">
+            <div class="event-date-badge event-date-badge-lg">
+                <span class="edb-month">{{ event.date.strftime('%b') }}</span>
+                <span class="edb-day">{{ event.date.strftime('%d') }}</span>
+                <span class="edb-year">{{ event.date.strftime('%Y') }}</span>
+            </div>
+            <div>
+                <h1>{{ event.title }}</h1>
+                <div class="event-detail-meta">
+                    {% if event.time %}
+                    <span class="event-meta-line">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        {{ event.time }}
+                    </span>
+                    {% endif %}
+                    {% if event.location %}
+                    <span class="event-meta-line">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        {{ event.location }}
+                    </span>
+                    {% endif %}
+                    <span class="event-meta-line">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        Hosted by {{ event.host.name }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {% if event.description %}
+        <div class="event-description">
+            <p>{{ event.description }}</p>
+        </div>
+        {% endif %}
+
+        <!-- RSVP Section -->
+        {% if not event.is_past %}
+        <div class="event-rsvp-section">
+            <div class="event-rsvp-counts-detail">
+                <div class="rsvp-stat">
+                    <span class="rsvp-stat-num">{{ event.going_count }}</span>
+                    <span class="rsvp-stat-label">Going</span>
+                </div>
+                <div class="rsvp-stat">
+                    <span class="rsvp-stat-num">{{ event.interested_count }}</span>
+                    <span class="rsvp-stat-label">Interested</span>
+                </div>
+                {% if event.max_attendees %}
+                <div class="rsvp-stat">
+                    <span class="rsvp-stat-num">{{ event.max_attendees - event.going_count }}</span>
+                    <span class="rsvp-stat-label">Spots Left</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{{ url_for('phase3.event_rsvp', event_id=event.id) }}" class="rsvp-buttons">
+                <button type="submit" name="status" value="going"
+                    class="btn {% if user_status == 'going' %}btn-gold{% else %}btn-outline{% endif %}">
+                    {% if user_status == 'going' %}&#10003; Going{% else %}Going{% endif %}
+                </button>
+                <button type="submit" name="status" value="interested"
+                    class="btn {% if user_status == 'interested' %}btn-gold{% else %}btn-outline{% endif %}">
+                    {% if user_status == 'interested' %}&#10003; Interested{% else %}Interested{% endif %}
+                </button>
+                {% if user_status %}
+                <button type="submit" name="status" value="not_going" class="btn btn-ghost btn-sm">Cancel RSVP</button>
+                {% endif %}
+            </form>
+        </div>
+        {% else %}
+        <div class="event-past-banner">This event has ended.</div>
+        {% endif %}
+
+        <!-- Attendees -->
+        {% if going_users %}
+        <div class="event-attendees">
+            <h3>Going ({{ going_users|length }})</h3>
+            <div class="attendee-avatars">
+                {% for u in going_users[:12] %}
+                <a href="{{ url_for('profile', user_id=u.id) }}" class="avatar avatar-sm" title="{{ u.name }}">
+                    {% if u.profile_photo %}
+                    <img src="{{ url_for('static', filename=u.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ u.name[0]|upper }}</span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+                {% if going_users|length > 12 %}
+                <span class="more-count">+{{ going_users|length - 12 }}</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if interested_users %}
+        <div class="event-attendees">
+            <h3>Interested ({{ interested_users|length }})</h3>
+            <div class="attendee-avatars">
+                {% for u in interested_users[:12] %}
+                <a href="{{ url_for('profile', user_id=u.id) }}" class="avatar avatar-sm" title="{{ u.name }}">
+                    {% if u.profile_photo %}
+                    <img src="{{ url_for('static', filename=u.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ u.name[0]|upper }}</span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+                {% if interested_users|length > 12 %}
+                <span class="more-count">+{{ interested_users|length - 12 }}</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

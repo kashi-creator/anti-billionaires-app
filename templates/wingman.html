@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}AI Wingman{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <a href="{{ url_for('feed') }}" class="chat-back">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </a>
+        <div>
+            <strong style="color:var(--gold)">AI Wingman</strong>
+            <span class="header-subtitle" style="font-size:0.8rem">{{ today_count }}/{{ daily_limit }} messages today</span>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        {% if not chats %}
+        <div class="wingman-intro">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <h3>Your AI Business Wingman</h3>
+            <p>Ask about strategy, mindset, productivity, or anything to level up your game.</p>
+        </div>
+        {% endif %}
+        {% for chat in chats %}
+        <div class="chat-msg {% if chat.role == 'user' %}sent{% else %}received{% endif %}">
+            <div class="chat-bubble {% if chat.role == 'assistant' %}wingman-bubble{% endif %}">
+                {{ chat.content }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-input-bar" id="wingmanForm" onsubmit="sendWingman(event)">
+        <input type="text" id="wingmanInput" placeholder="Ask your wingman..." autocomplete="off" required>
+        <button type="submit" class="btn btn-gold btn-sm" id="wingmanSend">Send</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chatBox = document.getElementById('chatMessages');
+chatBox.scrollTop = chatBox.scrollHeight;
+
+function sendWingman(e) {
+    e.preventDefault();
+    const input = document.getElementById('wingmanInput');
+    const btn = document.getElementById('wingmanSend');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    // Add user message
+    const userDiv = document.createElement('div');
+    userDiv.className = 'chat-msg sent';
+    userDiv.innerHTML = `<div class="chat-bubble">${escapeHtml(msg)}</div>`;
+    chatBox.appendChild(userDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    fetch('/wingman/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: msg})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        if (data.success) {
+            const asstDiv = document.createElement('div');
+            asstDiv.className = 'chat-msg received';
+            asstDiv.innerHTML = `<div class="chat-bubble wingman-bubble">${escapeHtml(data.reply)}</div>`;
+            chatBox.appendChild(asstDiv);
+        } else {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'chat-msg received';
+            errDiv.innerHTML = `<div class="chat-bubble wingman-bubble" style="color:var(--error)">${data.error || 'Error'}</div>`;
+            chatBox.appendChild(errDiv);
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+    });
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+</script>
+{% endblock %}

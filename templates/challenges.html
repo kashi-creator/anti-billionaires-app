@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Weekly Challenges{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Weekly Challenges</h1>
+        {% if current_user.is_admin %}
+        <a href="{{ url_for('features.create_challenge') }}" class="btn btn-gold btn-sm">Create Challenge</a>
+        {% endif %}
+    </div>
+
+    {% if active %}
+    <h2 class="section-title" style="color:var(--gold)">Active Challenges</h2>
+    <div class="challenges-grid">
+        {% for ch in active %}
+        <a href="{{ url_for('features.challenge_detail', ch_id=ch.id) }}" class="card challenge-card">
+            <div class="challenge-badge active">ACTIVE</div>
+            <h3>{{ ch.title }}</h3>
+            <p>{{ ch.description[:100] }}{% if ch.description|length > 100 %}...{% endif %}</p>
+            <div class="challenge-meta">
+                <span>{{ ch.submission_count }} submissions</span>
+                <span>+{{ ch.points_reward }} pts</span>
+            </div>
+            <div class="challenge-dates">{{ ch.start_date.strftime('%b %d') }} - {{ ch.end_date.strftime('%b %d') }}</div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <h3>No active challenges</h3>
+        <p>Check back soon for the next challenge from the brotherhood.</p>
+    </div>
+    {% endif %}
+
+    {% if past %}
+    <h2 class="section-title" style="margin-top:2rem">Past Challenges</h2>
+    <div class="challenges-grid">
+        {% for ch in past %}
+        <a href="{{ url_for('features.challenge_detail', ch_id=ch.id) }}" class="card challenge-card past">
+            <h3>{{ ch.title }}</h3>
+            <div class="challenge-meta">
+                <span>{{ ch.submission_count }} submissions</span>
+                <span>Ended {{ ch.end_date.strftime('%b %d') }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

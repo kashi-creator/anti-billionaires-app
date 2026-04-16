@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}Feed{% endblock %}
+
+{% block content %}
+<div class="feed-layout">
+<div class="feed-container">
+    <div class="feed-header">
+        <h1>The Feed</h1>
+        <span class="member-badge">{{ member_count }} member{{ 's' if member_count != 1 }} strong</span>
+    </div>
+
+    <!-- Feed Filters -->
+    <div class="feed-filters">
+        <a href="{{ url_for('feed', filter='all') }}" class="filter-btn {% if filter_type == 'all' %}active{% endif %}">All Posts</a>
+        <a href="{{ url_for('feed', filter='following') }}" class="filter-btn {% if filter_type == 'following' %}active{% endif %}">Following</a>
+    </div>
+
+    <!-- Story Strip -->
+    <div class="story-strip" id="storyStrip">
+        <!-- Create Story -->
+        <div class="story-circle story-create" onclick="document.getElementById('storyModal').style.display='flex'">
+            <div class="avatar avatar-md">
+                {% if current_user.profile_photo %}
+                <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ current_user.name[0]|upper }}</span>
+                {% endif %}
+                <div class="story-plus">+</div>
+            </div>
+            <span class="story-name">Your Story</span>
+        </div>
+    </div>
+
+    <!-- Story Create Modal -->
+    <div class="modal-overlay" id="storyModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+        <div class="modal-content">
+            <h3 style="margin-bottom:1rem;color:var(--gold)">Create Story</h3>
+            <form method="POST" action="{{ url_for('features.create_story') }}" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Image</label>
+                    <input type="file" name="image" accept="image/*" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>Or text</label>
+                    <textarea name="text_content" class="input-field" rows="2" placeholder="Share a thought..."></textarea>
+                </div>
+                <input type="hidden" name="bg_color" value="#111111">
+                <button type="submit" class="btn btn-gold" style="width:100%">Post Story</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- New Post -->
+    <div class="post-composer">
+        <form method="POST" action="{{ url_for('create_post') }}" enctype="multipart/form-data" id="postForm">
+            <div class="composer-top">
+                <div class="avatar avatar-md">
+                    {% if current_user.profile_photo %}
+                    <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ current_user.name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <textarea name="content" placeholder="Share something with the club..." rows="2" required id="postContent"></textarea>
+            </div>
+            <div class="composer-bottom">
+                <div class="composer-actions-left">
+                    <label class="composer-upload" for="postImage">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span>Photo</span>
+                    </label>
+                    <button type="button" class="composer-upload" onclick="togglePollCreator()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/><line x1="9" y1="17" x2="11" y2="17"/></svg>
+                        <span>Poll</span>
+                    </button>
+                </div>
+                <input type="file" id="postImage" name="image" accept="image/*" hidden onchange="previewPostImage(this)">
+                <button type="submit" class="btn btn-gold btn-sm">Post</button>
+            </div>
+            <div id="imagePreview" class="image-preview" style="display:none">
+                <img id="previewImg" src="" alt="Preview">
+                <button type="button" onclick="clearPreview()" class="preview-remove">&times;</button>
+            </div>
+            <!-- Poll Creator -->
+            <div id="pollCreator" class="poll-creator" style="display:none">
+                <div class="poll-creator-header">
+                    <input type="text" name="poll_question" placeholder="Ask a question..." class="poll-question-input">
+                    <button type="button" onclick="togglePollCreator()" class="poll-close-btn">&times;</button>
+                </div>
+                <div id="pollOptions">
+                    <input type="text" name="poll_options[]" placeholder="Option 1" class="poll-option-input">
+                    <input type="text" name="poll_options[]" placeholder="Option 2" class="poll-option-input">
+                </div>
+                <button type="button" onclick="addPollOption()" class="btn btn-ghost btn-xs" style="margin-top:0.5rem">+ Add Option</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Posts -->
+    <div class="posts-list">
+        {% for post in posts %}
+        <div class="post-card" id="post-{{ post.id }}">
+            <div class="post-header">
+                <a href="{{ url_for('profile', user_id=post.author.id) }}" class="post-author">
+                    <div class="avatar avatar-sm">
+                        {% if post.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ post.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="author-info">
+                        <strong>{{ post.author.name }}</strong>
+                        <span class="post-time">{{ post.time_ago }}</span>
+                    </div>
+                </a>
+                {% if post.user_id == current_user.id or current_user.is_admin %}
+                <button class="post-menu-btn" onclick="deletePost({{ post.id }})">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                </button>
+                {% endif %}
+            </div>
+            <div class="post-content">
+                <p>{{ post.content }}</p>
+                {% if post.image_path %}
+                <div class="post-image">
+                    <img src="{{ url_for('static', filename=post.image_path) }}" alt="Post image" loading="lazy">
+                </div>
+                {% endif %}
+            </div>
+
+            {% if post.poll %}
+            <div class="poll-section" id="poll-{{ post.poll.id }}">
+                <div class="poll-question">{{ post.poll.question }}</div>
+                {% set has_voted = post.poll.user_voted(current_user) %}
+                {% set total = post.poll.total_votes %}
+                {% set voted_id = post.poll.user_vote_option_id(current_user) %}
+                {% for option in post.poll.options %}
+                <div class="poll-option {% if has_voted %}voted{% endif %} {% if voted_id == option.id %}selected{% endif %}"
+                     {% if not has_voted %}onclick="votePoll({{ option.id }}, {{ post.poll.id }})"{% endif %}
+                     data-option-id="{{ option.id }}">
+                    <div class="poll-option-bar" style="width: {% if has_voted %}{{ option.percentage(total) }}{% else %}0{% endif %}%"></div>
+                    <span class="poll-option-text">{{ option.text }}</span>
+                    {% if has_voted %}
+                    <span class="poll-option-pct">{{ option.percentage(total) }}%</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="poll-total">{{ total }} vote{{ 's' if total != 1 }}</div>
+            </div>
+            {% endif %}
+
+            <div class="post-actions">
+                <button class="action-btn like-btn {% if post.is_liked_by(current_user) %}liked{% endif %}" onclick="toggleLike({{ post.id }}, this)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{% if post.is_liked_by(current_user) %}#D4AF37{% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                    <span class="like-count">{{ post.like_count }}</span>
+                </button>
+                <button class="action-btn comment-toggle" onclick="toggleComments({{ post.id }})">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    <span>{{ post.comments|length }}</span>
+                </button>
+                <button class="action-btn bookmark-btn {% if post.bookmarks|selectattr('user_id','equalto',current_user.id)|list %}bookmarked{% endif %}" onclick="toggleBookmark({{ post.id }}, this)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{% if post.bookmarks|selectattr('user_id','equalto',current_user.id)|list %}#D4AF37{% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                </button>
+            </div>
+
+            <!-- Comments -->
+            <div class="comments-section" id="comments-{{ post.id }}" style="{% if post.comments|length == 0 %}display:none{% endif %}">
+                {% for comment in post.comments %}
+                <div class="comment">
+                    <a href="{{ url_for('profile', user_id=comment.author.id) }}" class="avatar avatar-xs">
+                        {% if comment.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=comment.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ comment.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </a>
+                    <div class="comment-body">
+                        <div class="comment-meta">
+                            <strong>{{ comment.author.name }}</strong>
+                            <span>{{ comment.time_ago }}</span>
+                        </div>
+                        <p>{{ comment.content }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+                <form class="comment-form" method="POST" action="{{ url_for('add_comment', post_id=post.id) }}">
+                    <div class="avatar avatar-xs">
+                        {% if current_user.profile_photo %}
+                        <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ current_user.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <input type="text" name="content" placeholder="Write a comment..." required>
+                    <button type="submit" class="btn btn-ghost btn-xs">Post</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            <h3>No posts yet</h3>
+            <p>Be the first to share something with the club.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Sidebar: Welcome Checklist -->
+{% if checklist and not checklist_all_done %}
+<div class="feed-sidebar" {% if checklist_all_done %}data-checklist-complete="true"{% endif %}>
+    <div class="sidebar-checklist-card">
+        <div class="sidebar-checklist-header">
+            <h3>Getting Started</h3>
+            <span class="sidebar-checklist-pct">{{ checklist_pct }}%</span>
+        </div>
+        <div class="progress-bar-track" style="margin-bottom:0.75rem">
+            <div class="progress-bar-fill" style="width: {{ checklist_pct }}%"></div>
+        </div>
+        {% for entry in checklist %}
+        <div class="sidebar-check-item {% if entry.completed %}done{% endif %}">
+            {% if entry.completed %}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            {% else %}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+            {% endif %}
+            {% if entry.completed %}
+            <span>{{ entry.item.title }}</span>
+            {% else %}
+            <a href="{{ entry.item.link }}">{{ entry.item.title }}</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <a href="{{ url_for('phase3.welcome') }}" class="btn btn-ghost btn-xs" style="margin-top:0.5rem;width:100%">View full checklist</a>
+    </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleLike(postId, btn) {
+    fetch(`/like/${postId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            const svg = btn.querySelector('svg');
+            const count = btn.querySelector('.like-count');
+            if (data.liked) {
+                btn.classList.add('liked');
+                svg.setAttribute('fill', '#D4AF37');
+            } else {
+                btn.classList.remove('liked');
+                svg.setAttribute('fill', 'none');
+            }
+            count.textContent = data.count;
+            btn.style.transform = 'scale(1.2)';
+            setTimeout(() => btn.style.transform = 'scale(1)', 200);
+        });
+}
+
+function toggleComments(postId) {
+    const section = document.getElementById(`comments-${postId}`);
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        section.style.animation = 'slideDown 0.3s ease';
+    } else {
+        section.style.display = 'none';
+    }
+}
+
+function deletePost(postId) {
+    if (!confirm('Delete this post?')) return;
+    fetch(`/post/${postId}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const card = document.getElementById(`post-${postId}`);
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.95)';
+                setTimeout(() => card.remove(), 300);
+            }
+        });
+}
+
+function previewPostImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function clearPreview() {
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('postImage').value = '';
+}
+
+function togglePollCreator() {
+    const el = document.getElementById('pollCreator');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function addPollOption() {
+    const container = document.getElementById('pollOptions');
+    const count = container.children.length + 1;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = 'poll_options[]';
+    input.placeholder = `Option ${count}`;
+    input.className = 'poll-option-input';
+    container.appendChild(input);
+}
+
+function toggleBookmark(postId, btn) {
+    fetch(`/bookmark/${postId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const svg = btn.querySelector('svg');
+                if (data.bookmarked) {
+                    btn.classList.add('bookmarked');
+                    svg.setAttribute('fill', '#D4AF37');
+                } else {
+                    btn.classList.remove('bookmarked');
+                    svg.setAttribute('fill', 'none');
+                }
+            }
+        });
+}
+
+// Load stories
+function loadStories() {
+    fetch('/api/stories')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const strip = document.getElementById('storyStrip');
+                data.story_users.forEach(u => {
+                    const div = document.createElement('a');
+                    div.href = `/stories/${u.stories[0].id}`;
+                    div.className = `story-circle ${u.stories.some(s => !s.viewed) ? 'has-new' : ''}`;
+                    div.innerHTML = `<div class="avatar avatar-md">${u.photo ? `<img src="/static/${u.photo}" alt="">` : `<span>${u.name[0].toUpperCase()}</span>`}</div><span class="story-name">${u.name.split(' ')[0]}</span>`;
+                    strip.appendChild(div);
+                });
+            }
+        });
+}
+loadStories();
+
+function votePoll(optionId, pollId) {
+    fetch(`/poll/vote/${optionId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) return;
+            const pollEl = document.getElementById(`poll-${pollId}`);
+            data.results.forEach(opt => {
+                const optEl = pollEl.querySelector(`[data-option-id="${opt.id}"]`);
+                if (optEl) {
+                    optEl.classList.add('voted');
+                    if (opt.id === optionId) optEl.classList.add('selected');
+                    optEl.onclick = null;
+                    optEl.querySelector('.poll-option-bar').style.width = opt.percentage + '%';
+                    const textEl = optEl.querySelector('.poll-option-text');
+                    // Add percentage
+                    let pctEl = optEl.querySelector('.poll-option-pct');
+                    if (!pctEl) {
+                        pctEl = document.createElement('span');
+                        pctEl.className = 'poll-option-pct';
+                        optEl.appendChild(pctEl);
+                    }
+                    pctEl.textContent = opt.percentage + '%';
+                }
+            });
+            pollEl.querySelector('.poll-total').textContent = data.total + ' vote' + (data.total !== 1 ? 's' : '');
+        });
+}
+</script>
+{% endblock %}

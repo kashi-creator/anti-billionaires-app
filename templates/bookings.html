@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}My Bookings{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>My Bookings</h1>
+    </div>
+
+    {% if received %}
+    <h2 class="section-title" style="color:var(--gold)">Incoming Requests</h2>
+    {% for b in received %}
+    <div class="card booking-card" style="margin-bottom:1rem">
+        <div class="booking-info">
+            <strong>{{ b.booker.name }}</strong> wants to book a call
+            <div class="booking-meta">
+                <span>{{ b.date.strftime('%b %d, %Y') }} at {{ b.time }}</span>
+                <span class="booking-status status-{{ b.status }}">{{ b.status|capitalize }}</span>
+            </div>
+            {% if b.notes %}<p style="color:var(--text-secondary);margin-top:0.5rem">{{ b.notes }}</p>{% endif %}
+        </div>
+        {% if b.status == 'pending' %}
+        <div class="booking-actions">
+            <button class="btn btn-gold btn-sm" onclick="confirmBooking({{ b.id }})">Confirm</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelBooking({{ b.id }})">Decline</button>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <h2 class="section-title" style="margin-top:2rem">Your Bookings</h2>
+    {% for b in made %}
+    <div class="card booking-card" style="margin-bottom:1rem">
+        <div class="booking-info">
+            <strong>Call with {{ b.host.name }}</strong>
+            <div class="booking-meta">
+                <span>{{ b.date.strftime('%b %d, %Y') }} at {{ b.time }}</span>
+                <span class="booking-status status-{{ b.status }}">{{ b.status|capitalize }}</span>
+            </div>
+            {% if b.meeting_url and b.status == 'confirmed' %}
+            <a href="{{ b.meeting_url }}" target="_blank" class="btn btn-gold btn-xs" style="margin-top:0.5rem">Join Call</a>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No bookings yet</h3>
+        <p>Book a 1-on-1 call with another member from their profile.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmBooking(id) {
+    fetch(`/bookings/${id}/confirm`, {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload()});
+}
+function cancelBooking(id) {
+    fetch(`/bookings/${id}/cancel`, {method:'POST'}).then(r=>r.json()).then(d=>{if(d.success)location.reload()});
+}
+</script>
+{% endblock %}

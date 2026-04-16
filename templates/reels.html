@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Reels{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Reels</h1>
+        <a href="{{ url_for('features.create_reel') }}" class="btn btn-gold btn-sm">Post Reel</a>
+    </div>
+
+    <div class="reels-feed">
+        {% for reel in reels %}
+        <div class="reel-card">
+            <div class="reel-video">
+                <iframe src="{{ reel.embed_url }}" frameborder="0" allowfullscreen allow="autoplay; encrypted-media" loading="lazy"></iframe>
+            </div>
+            <div class="reel-info">
+                <a href="{{ url_for('profile', user_id=reel.author.id) }}" class="post-author">
+                    <div class="avatar avatar-sm">
+                        {% if reel.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=reel.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ reel.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <strong>{{ reel.author.name }}</strong>
+                </a>
+                {% if reel.title %}
+                <p class="reel-title">{{ reel.title }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <h3>No reels yet</h3>
+            <p>Share the first video with the brotherhood.</p>
+            <a href="{{ url_for('features.create_reel') }}" class="btn btn-gold btn-sm" style="margin-top:1rem">Post Reel</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

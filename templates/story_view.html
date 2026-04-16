@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Story by {{ story.author.name }}{% endblock %}
+
+{% block content %}
+<div class="story-viewer" onclick="window.location='{{ url_for('feed') }}'">
+    <div class="story-close">
+        <a href="{{ url_for('feed') }}">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </a>
+    </div>
+    <div class="story-author-bar">
+        <div class="avatar avatar-sm">
+            {% if story.author.profile_photo %}
+            <img src="{{ url_for('static', filename=story.author.profile_photo) }}" alt="">
+            {% else %}
+            <span>{{ story.author.name[0]|upper }}</span>
+            {% endif %}
+        </div>
+        <strong>{{ story.author.name }}</strong>
+        <span class="story-time">{{ story.created_at.strftime('%H:%M') }}</span>
+    </div>
+    <div class="story-content" style="background: {{ story.bg_color }}">
+        {% if story.image_path %}
+        <img src="{{ url_for('static', filename=story.image_path) }}" alt="Story" class="story-image">
+        {% endif %}
+        {% if story.text_content %}
+        <p class="story-text">{{ story.text_content }}</p>
+        {% endif %}
+    </div>
+    <div class="story-views">{{ story.view_count }} view{{ 's' if story.view_count != 1 }}</div>
+</div>
+{% endblock %}

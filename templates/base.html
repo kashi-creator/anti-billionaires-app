@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ABMC{% endblock %} | Anti Billionaires Men's Club</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/phase3.css') }}">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('feed') }}" class="nav-logo">
+                <span class="logo-text">ABMC</span>
+                <span class="logo-divider"></span>
+                <span class="logo-tagline">Anti Billionaires Men's Club</span>
+            </a>
+            <div class="nav-links">
+                <a href="{{ url_for('feed') }}" class="nav-link {% if request.endpoint == 'feed' %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>Feed</span>
+                </a>
+                <a href="{{ url_for('spaces') }}" class="nav-link {% if request.endpoint in ['spaces', 'space_detail', 'create_space'] %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    <span>Spaces</span>
+                </a>
+                <a href="{{ url_for('phase3.events') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('phase3.event') %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Events</span>
+                </a>
+                <a href="{{ url_for('leaderboard') }}" class="nav-link {% if request.endpoint == 'leaderboard' %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 000-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0012 0V2Z"/></svg>
+                    <span>Leaderboard</span>
+                </a>
+                <a href="{{ url_for('phase3.lessons') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('phase3.lesson') %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                    <span>The Vault</span>
+                </a>
+                <a href="{{ url_for('features.inbox') }}" class="nav-link {% if request.endpoint and request.endpoint.startswith('features.') and 'message' in (request.endpoint or '') %}active{% endif %}">
+                    <div class="notif-bell-wrap">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        <span class="notif-badge msg-badge" id="msgBadge" style="display:none">0</span>
+                    </div>
+                    <span>Messages</span>
+                </a>
+                <a href="{{ url_for('features.reels') }}" class="nav-link {% if request.endpoint == 'features.reels' %}active{% endif %}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    <span>Reels</span>
+                </a>
+
+                <!-- Points badge -->
+                <div class="nav-points-wrap">
+                    <span class="nav-points-badge">{{ current_user.points or 0 }} pts</span>
+                    {% if current_user.streak_days and current_user.streak_days > 1 %}
+                    <span class="nav-streak-badge">{{ current_user.streak_days }}d</span>
+                    {% endif %}
+                </div>
+
+                <!-- Notification bell with dropdown -->
+                <div class="nav-notif-container" id="notifContainer">
+                    <button class="nav-link nav-notif-btn" onclick="toggleNotifDropdown(event)" type="button">
+                        <div class="notif-bell-wrap">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                            <span class="notif-badge" id="notifBadge" {% if current_user.unread_notification_count == 0 %}style="display:none"{% endif %}>{{ current_user.unread_notification_count }}</span>
+                        </div>
+                    </button>
+                    <div class="notif-dropdown" id="notifDropdown">
+                        <div class="notif-dropdown-header">
+                            <strong>Notifications</strong>
+                            <a href="{{ url_for('notifications') }}">View all</a>
+                        </div>
+                        <div class="notif-dropdown-list" id="notifDropdownList">
+                            <div class="notif-dropdown-empty">Loading...</div>
+                        </div>
+                        <div class="notif-dropdown-footer">
+                            <button onclick="markAllReadFromDropdown()" class="btn btn-ghost btn-xs">Mark all read</button>
+                        </div>
+                    </div>
+                </div>
+
+                {% if not current_user.has_active_subscription %}
+                <a href="{{ url_for('pricing') }}" class="btn btn-gold btn-sm nav-upgrade-btn">UPGRADE</a>
+                {% endif %}
+
+                <!-- Avatar dropdown -->
+                <div class="nav-avatar-container" id="avatarContainer">
+                    <button class="nav-link nav-avatar-btn" onclick="toggleAvatarDropdown(event)" type="button">
+                        <div class="nav-avatar">
+                            {% if current_user.profile_photo %}
+                            <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                            {% else %}
+                            <span>{{ current_user.name[0]|upper }}</span>
+                            {% endif %}
+                        </div>
+                    </button>
+                    <div class="avatar-dropdown" id="avatarDropdown">
+                        <a href="{{ url_for('profile', user_id=current_user.id) }}" class="avatar-dd-item">Profile</a>
+                        <a href="{{ url_for('edit_profile') }}" class="avatar-dd-item">Edit Profile</a>
+                        <a href="{{ url_for('phase3.welcome') }}" class="avatar-dd-item">Welcome Checklist</a>
+                        <a href="{{ url_for('features.bookmarks') }}" class="avatar-dd-item">My Bookmarks</a>
+                        <a href="{{ url_for('features.deals') }}" class="avatar-dd-item">My Deals</a>
+                        <a href="{{ url_for('features.referrals') }}" class="avatar-dd-item">Referrals</a>
+                        {% if current_user.has_active_subscription %}
+                        <form method="POST" action="{{ url_for('billing_portal') }}">
+                            <button type="submit" class="avatar-dd-item avatar-dd-btn">Manage Billing</button>
+                        </form>
+                        {% endif %}
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('admin_panel') }}" class="avatar-dd-item avatar-dd-admin">Admin Panel</a>
+                        {% endif %}
+                        <div class="avatar-dd-divider"></div>
+                        <a href="{{ url_for('logout') }}" class="avatar-dd-item avatar-dd-logout">Logout</a>
+                    </div>
+                </div>
+            </div>
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mobile-menu" id="mobileMenu">
+            <a href="{{ url_for('feed') }}" class="mobile-link">Feed</a>
+            <a href="{{ url_for('spaces') }}" class="mobile-link">Spaces</a>
+            <a href="{{ url_for('phase3.events') }}" class="mobile-link">Events</a>
+            <a href="{{ url_for('leaderboard') }}" class="mobile-link">Leaderboard</a>
+            <a href="{{ url_for('phase3.lessons') }}" class="mobile-link">The Vault</a>
+            <a href="{{ url_for('members') }}" class="mobile-link">Members</a>
+            <a href="{{ url_for('features.inbox') }}" class="mobile-link">Messages</a>
+            <a href="{{ url_for('features.reels') }}" class="mobile-link">Reels</a>
+            <a href="{{ url_for('features.wins') }}" class="mobile-link">Wins</a>
+            <a href="{{ url_for('features.deals') }}" class="mobile-link">Deals</a>
+            <a href="{{ url_for('features.challenges') }}" class="mobile-link">Challenges</a>
+            <a href="{{ url_for('features.resources') }}" class="mobile-link">Resources</a>
+            <a href="{{ url_for('notifications') }}" class="mobile-link">
+                Notifications
+                {% if current_user.unread_notification_count > 0 %}
+                <span class="notif-badge-inline">{{ current_user.unread_notification_count }}</span>
+                {% endif %}
+            </a>
+            {% if not current_user.has_active_subscription %}
+            <a href="{{ url_for('pricing') }}" class="mobile-link mobile-upgrade">UPGRADE - $100/mo</a>
+            {% endif %}
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('admin_panel') }}" class="mobile-link">Admin Panel</a>
+            {% endif %}
+            <a href="{{ url_for('profile', user_id=current_user.id) }}" class="mobile-link">Profile ({{ current_user.points or 0 }} pts)</a>
+            <a href="{{ url_for('logout') }}" class="mobile-link logout">Logout</a>
+        </div>
+    </nav>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+            {{ message }}
+            <button onclick="this.parentElement.remove()" class="flash-close">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Mobile bottom tab bar -->
+    {% if current_user.is_authenticated %}
+    <nav class="mobile-tab-bar">
+        <a href="{{ url_for('feed') }}" class="tab-item {% if request.endpoint == 'feed' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            <span>Feed</span>
+        </a>
+        <a href="{{ url_for('features.inbox') }}" class="tab-item {% if request.endpoint and 'message' in (request.endpoint or '') %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>Messages</span>
+        </a>
+        <a href="{{ url_for('features.wins') }}" class="tab-item {% if request.endpoint == 'features.wins' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 010-5C7 4 7 7 7 7"/><path d="M18 9h1.5a2.5 2.5 0 000-5C17 4 17 7 17 7"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0012 0V2Z"/></svg>
+            <span>Wins</span>
+        </a>
+        <a href="{{ url_for('features.search') }}" class="tab-item {% if request.endpoint == 'features.search' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Search</span>
+        </a>
+        <a href="{{ url_for('profile', user_id=current_user.id) }}" class="tab-item {% if request.endpoint == 'profile' %}active{% endif %}">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Profile</span>
+        </a>
+    </nav>
+    {% endif %}
+
+    <!-- Confetti canvas -->
+    <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        function toggleMobileMenu() {
+            document.getElementById('mobileMenu').classList.toggle('open');
+        }
+
+        // Auto-dismiss flash messages
+        setTimeout(() => {
+            document.querySelectorAll('.flash').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(-10px)';
+                setTimeout(() => el.remove(), 300);
+            });
+        }, 4000);
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

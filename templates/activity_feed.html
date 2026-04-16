@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Activity Feed{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <div class="page-header">
+        <h1>Activity Feed</h1>
+        <span class="header-subtitle">What's happening in the club</span>
+    </div>
+
+    <div class="activity-list">
+        {% for act in activities %}
+        <div class="activity-item">
+            <div class="activity-dot"></div>
+            <div class="activity-content">
+                <strong>{{ act.user.name }}</strong> {{ act.detail }}
+                {% if act.link %}
+                <a href="{{ act.link }}" class="activity-link">View</a>
+                {% endif %}
+                <span class="activity-time">{{ act.time_ago }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>No activity yet</h3>
+            <p>Activity will show up here as members interact with the club.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

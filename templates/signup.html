@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Create Account{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">ABMC</div>
+            {% if stripe_mode is defined and stripe_mode %}
+            <h1>Payment Confirmed!</h1>
+            <p class="auth-subtitle">Create your account to get started</p>
+            {% elif founder_mode is defined and founder_mode %}
+            <h1>Welcome, Founder</h1>
+            <p class="auth-subtitle">Create your founder account</p>
+            {% else %}
+            <h1>Join the Club</h1>
+            <p class="auth-subtitle">Where real men build without billions</p>
+            {% endif %}
+        </div>
+        <form method="POST" enctype="multipart/form-data" class="auth-form"
+              {% if stripe_mode is defined and stripe_mode %}
+              action="{{ url_for('subscription_success', session_id=session_id) }}"
+              {% endif %}>
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required placeholder="Your name" autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="your@email.com" autocomplete="email"
+                       value="{{ email or '' }}"
+                       {% if email %}readonly style="background:#222;color:#999;cursor:not-allowed;"{% endif %}>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Min 6 characters" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required placeholder="Confirm password" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="profile_photo">Profile Photo <span class="optional">(optional)</span></label>
+                <div class="file-upload" onclick="document.getElementById('profile_photo').click()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span id="fileLabel">Choose a photo</span>
+                </div>
+                <input type="file" id="profile_photo" name="profile_photo" accept="image/*" hidden onchange="document.getElementById('fileLabel').textContent = this.files[0]?.name || 'Choose a photo'">
+            </div>
+            <button type="submit" class="btn btn-gold btn-full">Create Account</button>
+        </form>
+        <div class="auth-footer">
+            <p>Already a member? <a href="{{ url_for('login') }}">Sign in</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Members{% endblock %}
+
+{% block content %}
+<div class="members-container">
+    <div class="feed-header">
+        <h1>The Brotherhood</h1>
+        <span class="member-badge">{{ members|length }} member{{ 's' if members|length != 1 }}</span>
+    </div>
+    <div class="members-grid">
+        {% for member in members %}
+        <a href="{{ url_for('profile', user_id=member.id) }}" class="member-card">
+            <div class="avatar avatar-lg">
+                {% if member.profile_photo %}
+                <img src="{{ url_for('static', filename=member.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ member.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <h3>{{ member.name }}</h3>
+            {% if member.bio %}
+            <p class="member-bio">{{ member.bio[:80] }}{% if member.bio|length > 80 %}...{% endif %}</p>
+            {% endif %}
+            <span class="member-since">Joined {{ member.created_at.strftime('%b %Y') }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

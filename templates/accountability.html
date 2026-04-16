@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Accountability{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Accountability Hub</h1>
+        <span class="header-subtitle">Set goals, find partners, stay on track</span>
+    </div>
+
+    <div class="accountability-layout">
+        <!-- Goals Section -->
+        <div class="card" style="margin-bottom:1.5rem">
+            <h3 style="color:var(--gold);margin-bottom:1rem">Your Goals</h3>
+            <form method="POST" action="{{ url_for('features.create_goal') }}" style="margin-bottom:1rem">
+                <input type="text" name="title" placeholder="New goal..." class="input-field" required>
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                    <input type="date" name="target_date" class="input-field" style="flex:1">
+                    <button type="submit" class="btn btn-gold btn-sm">Add Goal</button>
+                </div>
+            </form>
+
+            {% for goal in goals %}
+            <div class="goal-item {% if goal.is_completed %}completed{% endif %}">
+                <div class="goal-header">
+                    <button class="goal-check" onclick="toggleGoal({{ goal.id }}, this)">
+                        {% if goal.is_completed %}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        {% else %}
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+                        {% endif %}
+                    </button>
+                    <div>
+                        <strong>{{ goal.title }}</strong>
+                        {% if goal.target_date %}
+                        <span class="post-time">Target: {{ goal.target_date.strftime('%b %d, %Y') }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <!-- Check-ins -->
+                {% if goal.checkins %}
+                <div class="goal-checkins">
+                    {% for ci in goal.checkins[:3] %}
+                    <div class="checkin-item">
+                        <span class="checkin-dot"></span>
+                        <span>{{ ci.content }}</span>
+                        <span class="post-time">{{ ci.created_at.strftime('%b %d') }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if not goal.is_completed %}
+                <form method="POST" action="{{ url_for('features.goal_checkin', goal_id=goal.id) }}" class="checkin-form">
+                    <input type="text" name="content" placeholder="Log a check-in..." class="input-field input-sm" required>
+                    <button type="submit" class="btn btn-ghost btn-xs">Check In</button>
+                </form>
+                {% endif %}
+            </div>
+            {% else %}
+            <p style="color:var(--text-muted)">No goals yet. Set your first goal above!</p>
+            {% endfor %}
+        </div>
+
+        <!-- Accountability Partners -->
+        <div class="card">
+            <h3 style="color:var(--gold);margin-bottom:1rem">Your Accountability Partners</h3>
+            {% for pair in pairs %}
+            {% set partner = pair.user2 if pair.user1_id == current_user.id else pair.user1 %}
+            <div class="convo-card" style="margin-bottom:0.5rem">
+                <div class="avatar avatar-sm">
+                    {% if partner.profile_photo %}
+                    <img src="{{ url_for('static', filename=partner.profile_photo) }}" alt="">
+                    {% else %}
+                    <span>{{ partner.name[0]|upper }}</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <strong>{{ partner.name }}</strong>
+                    <span class="tier-badge tier-{{ partner.tier }}">{{ partner.tier_display }}</span>
+                </div>
+                <a href="{{ url_for('features.new_conversation', user_id=partner.id) }}" class="btn btn-ghost btn-xs" style="margin-left:auto">Message</a>
+            </div>
+            {% else %}
+            <p style="color:var(--text-muted)">No accountability partners yet. Visit a member's profile to pair up.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleGoal(goalId, btn) {
+    fetch(`/accountability/goals/${goalId}/complete`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+}
+</script>
+{% endblock %}

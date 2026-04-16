@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Book a Call with {{ host.name }}{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <a href="{{ url_for('profile', user_id=host.id) }}" class="back-link">&larr; Back to Profile</a>
+    <div class="card" style="margin-top:1rem">
+        <div class="booking-host">
+            <div class="avatar avatar-lg">
+                {% if host.profile_photo %}
+                <img src="{{ url_for('static', filename=host.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ host.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <h2>Book a 1-on-1 with {{ host.name }}</h2>
+                <span class="tier-badge tier-{{ host.tier }}">{{ host.tier_display }}</span>
+            </div>
+        </div>
+
+        {% if availabilities %}
+        <h3 style="margin:1.5rem 0 0.75rem">Availability</h3>
+        <div class="availability-list">
+            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+            {% for a in availabilities %}
+            <div class="avail-slot">
+                <strong>{{ days[a.day_of_week] }}</strong>
+                <span>{{ a.start_time }} - {{ a.end_time }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <h3 style="margin:1.5rem 0 0.75rem">Request a Call</h3>
+        <form method="POST" action="{{ url_for('features.create_booking', user_id=host.id) }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="date" class="input-field" required>
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" name="time" class="input-field" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea name="notes" class="input-field" rows="2" placeholder="What would you like to discuss?"></textarea>
+            </div>
+            <button type="submit" class="btn btn-gold" style="width:100%">Request Booking</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

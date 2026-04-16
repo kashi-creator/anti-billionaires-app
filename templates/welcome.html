@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Welcome{% endblock %}
+
+{% block content %}
+<div class="welcome-container">
+    <div class="welcome-header">
+        <h1>Welcome to the Club</h1>
+        <p class="welcome-subtitle">Complete these steps to get the most out of your membership.</p>
+    </div>
+
+    <!-- Progress -->
+    <div class="welcome-progress-card">
+        <div class="welcome-progress-top">
+            <span class="welcome-progress-text">{{ done }} of {{ total }} complete</span>
+            <span class="welcome-progress-pct">{{ pct }}%</span>
+        </div>
+        <div class="progress-bar-track progress-bar-lg">
+            <div class="progress-bar-fill" style="width: {{ pct }}%"></div>
+        </div>
+        {% if pct == 100 %}
+        <p class="welcome-complete-msg">You're all set. Welcome to the brotherhood.</p>
+        {% endif %}
+    </div>
+
+    <!-- Checklist Items -->
+    <div class="checklist">
+        {% for entry in checklist %}
+        <div class="checklist-item {% if entry.completed %}checklist-done{% endif %}">
+            <form method="POST" action="{{ url_for('phase3.check_item', item_id=entry.item.id) }}" class="checklist-check-form">
+                <button type="submit" class="checklist-checkbox">
+                    {% if entry.completed %}
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    {% else %}
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+                    {% endif %}
+                </button>
+            </form>
+            <div class="checklist-content">
+                <h3>{{ entry.item.title }}</h3>
+                {% if entry.item.description %}
+                <p>{{ entry.item.description }}</p>
+                {% endif %}
+            </div>
+            {% if entry.item.link and not entry.completed %}
+            <a href="{{ entry.item.link }}" class="btn btn-outline btn-sm">Go</a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

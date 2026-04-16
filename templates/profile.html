@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }}{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header-card">
+        <div class="profile-cover"></div>
+        <div class="profile-info">
+            <div class="avatar avatar-xl">
+                {% if user.profile_photo %}
+                <img src="{{ url_for('static', filename=user.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ user.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="profile-details">
+                <h1>{{ user.name }}</h1>
+                {% if user.bio %}
+                <p class="profile-bio">{{ user.bio }}</p>
+                {% endif %}
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ posts|length }}</span>
+                        <span class="stat-label">Posts</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="follower-count">{{ user.follower_count }}</span>
+                        <span class="stat-label">Followers</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ user.following_count }}</span>
+                        <span class="stat-label">Following</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number stat-gold">{{ user.points or 0 }}</span>
+                        <span class="stat-label">Points</span>
+                    </div>
+                    {% if user.streak_days and user.streak_days > 0 %}
+                    <div class="stat-item">
+                        <span class="stat-number streak-fire">{{ user.streak_days }}</span>
+                        <span class="stat-label">Streak</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="profile-tier-level">
+                    <span class="tier-badge tier-{{ user.tier }}">{{ user.tier_display }}</span>
+                    <span class="level-badge">Lv{{ user.level }} {{ user.level_title }}</span>
+                </div>
+                <div class="profile-meta">
+                    <span>Member since {{ user.created_at.strftime('%B %Y') }}</span>
+                    {% if user.city or user.country %}
+                    <span>{{ user.city }}{% if user.city and user.country %}, {% endif %}{{ user.country }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="profile-actions">
+                {% if current_user.id == user.id %}
+                <a href="{{ url_for('edit_profile') }}" class="btn btn-outline btn-sm">Edit Profile</a>
+                {% else %}
+                <button class="btn btn-sm {% if current_user.is_following(user) %}btn-outline{% else %}btn-gold{% endif %}" id="follow-btn" onclick="toggleFollow({{ user.id }})">
+                    {{ 'Following' if current_user.is_following(user) else 'Follow' }}
+                </button>
+                <a href="{{ url_for('features.new_conversation', user_id=user.id) }}" class="btn btn-outline btn-sm">Message</a>
+                {% if user.bookings_enabled %}
+                <a href="{{ url_for('features.booking_page', user_id=user.id) }}" class="btn btn-ghost btn-sm">Book Call</a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-posts">
+        <h2>Posts</h2>
+        {% for post in posts %}
+        <div class="post-card" id="post-{{ post.id }}">
+            <div class="post-header">
+                <div class="post-author">
+                    <div class="avatar avatar-sm">
+                        {% if post.author.profile_photo %}
+                        <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ post.author.name[0]|upper }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="author-info">
+                        <strong>{{ post.author.name }}</strong>
+                        <span class="post-time">{{ post.time_ago }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="post-content">
+                <p>{{ post.content }}</p>
+                {% if post.image_path %}
+                <div class="post-image">
+                    <img src="{{ url_for('static', filename=post.image_path) }}" alt="" loading="lazy">
+                </div>
+                {% endif %}
+            </div>
+
+            {% if post.poll %}
+            <div class="poll-section">
+                <div class="poll-question">{{ post.poll.question }}</div>
+                {% set has_voted = post.poll.user_voted(current_user) %}
+                {% set total = post.poll.total_votes %}
+                {% set voted_id = post.poll.user_vote_option_id(current_user) %}
+                {% for option in post.poll.options %}
+                <div class="poll-option voted {% if voted_id == option.id %}selected{% endif %}">
+                    <div class="poll-option-bar" style="width: {{ option.percentage(total) }}%"></div>
+                    <span class="poll-option-text">{{ option.text }}</span>
+                    <span class="poll-option-pct">{{ option.percentage(total) }}%</span>
+                </div>
+                {% endfor %}
+                <div class="poll-total">{{ total }} vote{{ 's' if total != 1 }}</div>
+            </div>
+            {% endif %}
+
+            <div class="post-actions">
+                <span class="action-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="{% if post.is_liked_by(current_user) %}#D4AF37{% else %}none{% endif %}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                    <span>{{ post.like_count }}</span>
+                </span>
+                <span class="action-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    <span>{{ post.comments|length }}</span>
+                </span>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No posts yet.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleFollow(userId) {
+    fetch(`/follow/${userId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            const btn = document.getElementById('follow-btn');
+            const countEl = document.getElementById('follower-count');
+            if (data.following) {
+                btn.textContent = 'Following';
+                btn.classList.remove('btn-gold');
+                btn.classList.add('btn-outline');
+            } else {
+                btn.textContent = 'Follow';
+                btn.classList.remove('btn-outline');
+                btn.classList.add('btn-gold');
+            }
+            countEl.textContent = data.follower_count;
+        });
+}
+</script>
+{% endblock %}

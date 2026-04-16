@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Deal Board{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Deal Board</h1>
+        <a href="{{ url_for('features.create_deal') }}" class="btn btn-gold btn-sm">Post a Deal</a>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="feed-filters" style="margin-bottom:1.5rem">
+        <a href="{{ url_for('features.deals', category='all') }}" class="filter-btn {% if selected_cat == 'all' %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="{{ url_for('features.deals', category=cat) }}" class="filter-btn {% if selected_cat == cat %}active{% endif %}">{{ cat|capitalize }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="deals-grid">
+        {% for deal in deals %}
+        <a href="{{ url_for('features.deal_detail', deal_id=deal.id) }}" class="card deal-card">
+            {% if deal.image_path %}
+            <div class="deal-img">
+                <img src="{{ url_for('static', filename=deal.image_path) }}" alt="">
+            </div>
+            {% endif %}
+            <div class="deal-body">
+                <span class="deal-category">{{ deal.category|capitalize }}</span>
+                <h3>{{ deal.title }}</h3>
+                <p>{{ deal.description[:100] }}{% if deal.description|length > 100 %}...{% endif %}</p>
+                <div class="deal-meta">
+                    <span>By {{ deal.author.name }}</span>
+                    <span>{{ deal.interest_count }} interested</span>
+                </div>
+            </div>
+        </a>
+        {% else %}
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+            <h3>No deals yet</h3>
+            <p>Post the first opportunity for the brotherhood.</p>
+            <a href="{{ url_for('features.create_deal') }}" class="btn btn-gold btn-sm" style="margin-top:1rem">Post a Deal</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

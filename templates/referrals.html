@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Referrals{% endblock %}
+
+{% block content %}
+<div class="page-container page-narrow">
+    <h1>Your Referral Program</h1>
+
+    <div class="card" style="margin-top:1.5rem">
+        <h3 style="color:var(--gold);margin-bottom:1rem">Share Your Link</h3>
+        <p style="color:var(--text-secondary);margin-bottom:1rem">Invite others to join the Anti-Billionaires Men's Club. When they sign up, you both earn bonus points.</p>
+        <div class="referral-link-box">
+            <input type="text" id="refLink" readonly value="{{ request.host_url.rstrip('/') }}/r/{{ referral_code }}" class="input-field" style="flex:1">
+            <button class="btn btn-gold btn-sm" onclick="copyRefLink()">Copy</button>
+        </div>
+        <p id="copyMsg" style="color:var(--success);margin-top:0.5rem;display:none">Copied!</p>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+        <h3 style="margin-bottom:1rem">Your Referrals ({{ referred|length }})</h3>
+        {% for user in referred %}
+        <div class="convo-card" style="margin-bottom:0.5rem">
+            <div class="avatar avatar-sm">
+                {% if user.profile_photo %}
+                <img src="{{ url_for('static', filename=user.profile_photo) }}" alt="">
+                {% else %}
+                <span>{{ user.name[0]|upper }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>{{ user.name }}</strong>
+                <span class="post-time">Joined {{ user.created_at.strftime('%b %d, %Y') }}</span>
+            </div>
+        </div>
+        {% else %}
+        <p style="color:var(--text-muted)">No referrals yet. Share your link to get started!</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyRefLink() {
+    const input = document.getElementById('refLink');
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    document.getElementById('copyMsg').style.display = 'block';
+    setTimeout(() => document.getElementById('copyMsg').style.display = 'none', 2000);
+}
+</script>
+{% endblock %}

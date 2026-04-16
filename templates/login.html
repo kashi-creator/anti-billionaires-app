@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <div class="auth-logo">ABMC</div>
+            <h1>Welcome Back</h1>
+            <p class="auth-subtitle">Anti Billionaires Men's Club</p>
+        </div>
+        <form method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required placeholder="your@email.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Enter password" autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-gold btn-full">Enter the Club</button>
+        </form>
+        <div class="auth-footer">
+            <p>Not a member? <a href="{{ url_for('pricing') }}">Apply for membership</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

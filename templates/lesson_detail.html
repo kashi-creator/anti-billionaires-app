@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson.title }}{% endblock %}
+
+{% block content %}
+<div class="lesson-detail-container">
+    <a href="{{ url_for('phase3.lessons') }}" class="back-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to {{ course.title }}
+    </a>
+
+    <!-- Course progress bar -->
+    {% set c_done, c_total = course.progress_for(current_user) %}
+    {% set c_pct = course.progress_pct(current_user) %}
+    <div class="lesson-course-progress">
+        <span class="progress-label">{{ course.title }} - {{ c_done }}/{{ c_total }} complete</span>
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width: {{ c_pct }}%"></div>
+        </div>
+    </div>
+
+    <div class="lesson-detail-card">
+        <h1>{{ lesson.title }}</h1>
+
+        {% if lesson.video_url %}
+        <div class="lesson-video">
+            <iframe src="{{ lesson.video_url }}" frameborder="0" allowfullscreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+        </div>
+        {% endif %}
+
+        <div class="lesson-content">
+            {{ lesson.content_html|safe }}
+        </div>
+
+        <div class="lesson-footer">
+            <form method="POST" action="{{ url_for('phase3.complete_lesson', course_id=course.id, lesson_id=lesson.id) }}" id="lessonCompleteForm">
+                {% if completed %}
+                <button type="submit" class="btn btn-outline btn-full">
+                    &#10003; Completed - Click to Undo
+                </button>
+                {% else %}
+                <button type="button" class="btn btn-gold btn-full" onclick="completeLessonWithCountdown('lessonCompleteForm')">
+                    Mark as Complete
+                </button>
+                {% endif %}
+            </form>
+
+            <div class="lesson-nav">
+                {% if prev_lesson %}
+                <a href="{{ url_for('phase3.lesson_detail', course_id=course.id, lesson_id=prev_lesson.id) }}" class="btn btn-ghost btn-sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    Previous
+                </a>
+                {% else %}
+                <span></span>
+                {% endif %}
+                {% if next_lesson %}
+                <a href="{{ url_for('phase3.lesson_detail', course_id=course.id, lesson_id=next_lesson.id) }}" class="btn btn-ghost btn-sm">
+                    Next
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

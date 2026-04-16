@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="feed-header">
+        <h1>Admin Panel</h1>
+        <span class="member-badge">Dashboard</span>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+            <div class="admin-stat-number">{{ total_members }}</div>
+            <div class="admin-stat-label">Total Members</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-number stat-gold">{{ total_subscribers }}</div>
+            <div class="admin-stat-label">Active Subscribers</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-number">{{ total_posts }}</div>
+            <div class="admin-stat-label">Total Posts</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-number">{{ total_events }}</div>
+            <div class="admin-stat-label">Events</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-number">{{ total_spaces }}</div>
+            <div class="admin-stat-label">Spaces</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="admin-stat-number">{{ total_courses }}</div>
+            <div class="admin-stat-label">Courses</div>
+        </div>
+    </div>
+
+    <!-- Member Management -->
+    <div class="admin-section">
+        <h2>Member Management</h2>
+        <div class="admin-member-list">
+            {% for member in members %}
+            <div class="admin-member-row">
+                <div class="admin-member-info">
+                    <a href="{{ url_for('profile', user_id=member.id) }}" class="avatar avatar-sm">
+                        {% if member.profile_photo %}
+                        <img src="{{ url_for('static', filename=member.profile_photo) }}" alt="">
+                        {% else %}
+                        <span>{{ member.name[0]|upper }}</span>
+                        {% endif %}
+                    </a>
+                    <div class="admin-member-details">
+                        <strong>{{ member.name }}</strong>
+                        <span class="admin-member-email">{{ member.email }}</span>
+                    </div>
+                </div>
+                <div class="admin-member-badges">
+                    {% if member.is_admin %}
+                    <span class="admin-badge admin-badge-admin">Admin</span>
+                    {% endif %}
+                    {% if member.subscription_status == 'active' %}
+                    <span class="admin-badge admin-badge-sub">Subscribed</span>
+                    {% else %}
+                    <span class="admin-badge admin-badge-free">Free</span>
+                    {% endif %}
+                    <span class="admin-badge admin-badge-pts">{{ member.points or 0 }} pts</span>
+                </div>
+                <div class="admin-member-actions">
+                    {% if member.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('toggle_admin', user_id=member.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-xs {% if member.is_admin %}btn-outline{% else %}btn-ghost{% endif %}">
+                            {{ 'Remove Admin' if member.is_admin else 'Make Admin' }}
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('toggle_subscription', user_id=member.id) }}" style="display:inline">
+                        <button type="submit" class="btn btn-xs {% if member.subscription_status == 'active' %}btn-outline{% else %}btn-ghost{% endif %}">
+                            {{ 'Revoke Access' if member.subscription_status == 'active' else 'Grant Access' }}
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
