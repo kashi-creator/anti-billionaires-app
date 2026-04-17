@@ -203,7 +203,7 @@ with app.app_context():
 # --- Seed spaces and events ---
 @app.route("/seed-content/<secret>")
 def seed_content(secret):
-    if secret != "abmc2026seed":
+    if secret != "onepercentmc2026":
         abort(404)
     from datetime import timedelta
     admin = User.query.filter_by(is_admin=True).first()

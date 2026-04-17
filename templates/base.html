@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ABMC{% endblock %} | Anti Billionaires Men's Club</title>
+    <title>{% block title %}1%MC{% endblock %} | The 1% Men's Club</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
@@ -15,9 +15,9 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{{ url_for('feed') }}" class="nav-logo">
-                <span class="logo-text">ABMC</span>
+                <span class="logo-text">1%MC</span>
                 <span class="logo-divider"></span>
-                <span class="logo-tagline">Anti Billionaires Men's Club</span>
+                <span class="logo-tagline">The 1% Men's Club</span>
             </a>
             <div class="nav-links">
                 <a href="{{ url_for('feed') }}" class="nav-link {% if request.endpoint == 'feed' %}active{% endif %}">
