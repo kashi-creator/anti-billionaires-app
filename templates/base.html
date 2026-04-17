@@ -11,6 +11,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/phase3.css') }}">
 </head>
 <body>
+    <!-- Floating gold orbs for premium background atmosphere -->
+    <div style="position:fixed;width:500px;height:500px;background:radial-gradient(circle,rgba(201,168,76,0.06) 0%,transparent 70%);border-radius:50%;filter:blur(60px);pointer-events:none;top:20%;left:-10%;animation:float 10s ease-in-out infinite;z-index:0;"></div>
+    <div style="position:fixed;width:400px;height:400px;background:radial-gradient(circle,rgba(201,168,76,0.04) 0%,transparent 70%);border-radius:50%;filter:blur(60px);pointer-events:none;bottom:10%;right:-5%;animation:float 12s ease-in-out infinite reverse;z-index:0;"></div>
+    <div style="position:fixed;width:350px;height:350px;background:radial-gradient(circle,rgba(201,168,76,0.03) 0%,transparent 70%);border-radius:50%;filter:blur(60px);pointer-events:none;top:60%;left:50%;animation:float 14s ease-in-out infinite 2s;z-index:0;"></div>
+
     {% if current_user.is_authenticated %}
     <nav class="navbar">
         <div class="nav-container">

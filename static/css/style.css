@@ -2902,3 +2902,242 @@ textarea.input-field { resize: vertical; font-family: inherit; }
 .search-input:focus {
     border-bottom-color: var(--gold);
 }
+
+/* ============================================
+   PREMIUM DESIGN UPGRADE
+   ============================================ */
+
+/* --- Keyframes --- */
+
+@keyframes shine {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50% { transform: translateY(-30px) scale(1.02); }
+}
+
+@keyframes grainShift {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-2%, -2%); }
+    30% { transform: translate(3%, 1%); }
+    50% { transform: translate(-1%, 3%); }
+    70% { transform: translate(2%, -1%); }
+    90% { transform: translate(-3%, 2%); }
+}
+
+/* --- 1. Gradient Animated Text on Headings --- */
+
+h1, h2 {
+    background: linear-gradient(135deg, #FFD700, #C9A84C, #FFD700, #E8D48B, #FFD700);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shine 3s linear infinite;
+}
+
+/* --- 2. Glassmorphism Cards --- */
+
+.post-card,
+.card,
+.space-card,
+.event-card,
+.lesson-card,
+.challenge-card,
+.deal-card,
+.win-card,
+.resource-card,
+.reel-card,
+.member-card {
+    background: rgba(201, 168, 76, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(201, 168, 76, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(201, 168, 76, 0.08);
+}
+
+.post-card:hover,
+.card:hover,
+.space-card:hover,
+.event-card:hover,
+.lesson-card:hover,
+.challenge-card:hover,
+.deal-card:hover,
+.win-card:hover,
+.resource-card:hover,
+.reel-card:hover,
+.member-card:hover {
+    border-color: rgba(201, 168, 76, 0.25);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(201, 168, 76, 0.12), 0 0 20px rgba(201, 168, 76, 0.06);
+}
+
+/* --- 3. Animated Buttons with Sweep Fill --- */
+
+.btn {
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #FFD700, #C9A84C, #D9BC6E);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: -1;
+}
+
+.btn:hover::before {
+    transform: scaleX(1);
+}
+
+.btn:hover {
+    color: var(--bg);
+    border-color: var(--gold-light);
+    box-shadow: 0 4px 24px rgba(201, 168, 76, 0.25);
+    transform: translateY(-1px);
+}
+
+.btn-gold::before {
+    background: linear-gradient(135deg, #D9BC6E, #FFD700, #C9A84C);
+    transform: scaleX(1);
+}
+
+.btn-gold:hover::before {
+    background: linear-gradient(135deg, #FFD700, #E8D48B, #FFD700);
+}
+
+.btn-ghost::before {
+    display: none;
+}
+
+/* --- 4. Gold Glow on Interactive Elements --- */
+
+a:hover,
+.nav-link:hover {
+    text-shadow: 0 0 10px rgba(201, 168, 76, 0.6);
+}
+
+.post-card:hover,
+.card:hover,
+.space-card:hover,
+.event-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(201, 168, 76, 0.15);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.15), 0 0 20px rgba(201, 168, 76, 0.08);
+}
+
+/* --- 5. Grain/Noise Overlay --- */
+
+body::after {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    right: -50%;
+    bottom: -50%;
+    width: 200%;
+    height: 200%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 256px 256px;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    animation: grainShift 8s steps(10) infinite;
+}
+
+/* --- 6. Editorial Typography --- */
+
+h1 {
+    font-size: clamp(2rem, 5vw, 4rem);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+}
+
+h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+.section-label,
+.section-tag,
+.eyebrow {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(201, 168, 76, 0.7);
+}
+
+/* --- 7. Smooth Transitions --- */
+
+*,
+*::before,
+*::after {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Exclude elements that should NOT transition everything */
+body::after,
+input,
+textarea {
+    transition: box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Prevent transition on layout-breaking properties */
+.main-content,
+.navbar,
+.mobile-tab-bar,
+.flash-container {
+    transition: none;
+}
+
+/* Re-enable specific transitions on nav elements */
+.nav-link,
+.mobile-link {
+    transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1), background 0.4s cubic-bezier(0.16, 1, 0.3, 1), text-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Premium scrollbar --- */
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(201, 168, 76, 0.2);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(201, 168, 76, 0.4);
+}
+
+/* --- Selection color --- */
+
+::selection {
+    background: rgba(201, 168, 76, 0.25);
+    color: #fff;
+}
