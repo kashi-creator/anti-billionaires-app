@@ -25,7 +25,7 @@
 <div class="pricing-container">
     <div class="pricing-header">
         <h1>Unlock the Full Experience</h1>
-        <p class="pricing-subtitle">Join the inner circle. Get access to everything the The 1% Men's Club has to offer.</p>
+        <p class="pricing-subtitle">Join the inner circle. Get access to everything Sovereign Society has to offer.</p>
     </div>
 
     {% if current_user.is_authenticated and current_user.has_active_subscription %}
@@ -154,11 +154,6 @@ document.getElementById('checkout-btn').addEventListener('click', async function
     if (!email) {
         alert('Please enter your email address.');
         document.getElementById('pricing-email').focus();
-        return;
-    }
-
-    if (this.dataset.founder === 'true') {
-        window.location.href = '/signup?founder=true&email=' + encodeURIComponent(email);
         return;
     }
 

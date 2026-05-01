@@ -127,6 +127,15 @@ def send_message(convo_id):
     _create_notification(other_id, "new_message", f"{current_user.name} sent you a message",
                          url_for('features.chat', convo_id=convo.id))
     db.session.commit()
+
+    # Engagement email — debounced 1/hr per recipient
+    try:
+        from cron import notify_dm_throttled
+        recipient = User.query.get(other_id)
+        if recipient:
+            notify_dm_throttled(recipient, current_user, content)
+    except Exception as e:
+        print(f"[DM email skip] {e}")
     return jsonify({
         "success": True,
         "message": {
@@ -275,7 +284,7 @@ def create_win():
     _log_activity(current_user.id, "shared_win", f'Shared a win: "{title}"',
                   url_for('features.wins'))
     db.session.commit()
-    flash("Win shared with the club!", "success")
+    flash("Win shared with the Society!", "success")
     return redirect(url_for('features.wins'))
 
 
@@ -522,13 +531,65 @@ def upvote_resource(res_id):
 #  REFERRAL SYSTEM
 # =====================================================================
 
+PAYMENTS_TO_QUALIFY = 6
+QUALIFIED_NEEDED_FOR_LIFETIME = 3
+
+
 @features.route('/referrals')
 @login_required
 def referrals():
     current_user.ensure_referral_code()
     db.session.commit()
-    referred = User.query.filter_by(referred_by=current_user.id).all()
-    return render_template('referrals.html', referral_code=current_user.referral_code, referred=referred)
+
+    referred = User.query.filter_by(referred_by=current_user.id).order_by(User.created_at.desc()).all()
+
+    # Classify each referral
+    detailed = []
+    qualified_count = 0
+    paying_count = 0
+    churned_count = 0
+    for r in referred:
+        payments = r.payments_made_count or 0
+        is_qualified = payments >= PAYMENTS_TO_QUALIFY
+        is_active = r.subscription_status == "active" or r.lifetime_access
+        is_churned = (not is_active) and (not is_qualified)
+        if is_qualified:
+            qualified_count += 1
+        elif is_active:
+            paying_count += 1
+        elif is_churned:
+            churned_count += 1
+        detailed.append({
+            "user": r,
+            "payments_made": payments,
+            "payments_to_qualify": PAYMENTS_TO_QUALIFY,
+            "is_qualified": is_qualified,
+            "is_active": is_active,
+            "is_churned": is_churned,
+            "progress_pct": min(100, int((payments / PAYMENTS_TO_QUALIFY) * 100)),
+        })
+
+    # Use stored count if it disagrees with computed (stored is source of truth for billing).
+    qualified_total = current_user.qualified_referrals_count or qualified_count
+    remaining_to_lifetime = max(0, QUALIFIED_NEEDED_FOR_LIFETIME - qualified_total)
+    progress_pct = min(100, int((qualified_total / QUALIFIED_NEEDED_FOR_LIFETIME) * 100))
+
+    referral_url = f"{request.host_url.rstrip('/')}/r/{current_user.referral_code}"
+
+    return render_template(
+        'referrals.html',
+        referral_code=current_user.referral_code,
+        referral_url=referral_url,
+        referred=detailed,
+        qualified_count=qualified_total,
+        paying_count=paying_count,
+        churned_count=churned_count,
+        threshold=QUALIFIED_NEEDED_FOR_LIFETIME,
+        remaining_to_lifetime=remaining_to_lifetime,
+        progress_pct=progress_pct,
+        has_lifetime=current_user.lifetime_access,
+        payments_to_qualify=PAYMENTS_TO_QUALIFY,
+    )
 
 
 @features.route('/r/<code>')
@@ -680,7 +741,7 @@ def seed_badges():
     if Badge.query.count() > 0:
         return
     defaults = [
-        ("First Steps", "Joined the club", "1F4AA", 0),
+        ("First Steps", "Joined the Society", "1F4AA", 0),
         ("Contributor", "Earned 100 points", "2B50", 100),
         ("Rising Star", "Earned 500 points", "2B50", 500),
         ("Elite Member", "Earned 1000 points", "1F451", 1000),
@@ -785,16 +846,47 @@ def poll_space_chat(space_id):
 #  AI WINGMAN
 # =====================================================================
 
+WINGMAN_SYSTEM_PROMPT = """You are the Wingman of Sovereign Society — a private network of operators, builders, and high-performers.
+
+Your role:
+- Sharp business advice (deal review, strategy, frameworks)
+- Accountability nudges (call out drift, ask hard questions)
+- Drafting (intros, pitches, replies, copy)
+- Mindset and execution coaching
+
+Your voice:
+- Direct. No hedging, no fluff, no disclaimers.
+- Confident but not cocky.
+- Treat the member as a peer who's already accomplished.
+- Push back when their thinking is weak.
+- Brief by default; expand only when they ask.
+
+Hard rules:
+- Never recommend illegal activity, harm to self/others, or financial fraud.
+- Don't claim to be a licensed professional (lawyer/CPA/doctor) — point them to one when needed.
+- Don't moralize. They're adults.
+"""
+
+
+def _wingman_daily_cap():
+    try:
+        return int(os.environ.get("WINGMAN_DAILY_MESSAGE_CAP", "50"))
+    except ValueError:
+        return 50
+
+
+def _wingman_today_count(user_id):
+    return AIChat.query.filter_by(user_id=user_id, role="user").filter(
+        AIChat.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    ).count()
+
+
 @features.route('/wingman')
 @login_required
 def wingman():
     chats = AIChat.query.filter_by(user_id=current_user.id).order_by(AIChat.created_at.asc()).limit(50).all()
-    # Daily limits by tier
-    tier_limits = {"bronze": 5, "silver": 15, "gold": 30, "platinum": 100}
-    daily_limit = tier_limits.get(current_user.tier, 5)
-    today_count = AIChat.query.filter_by(user_id=current_user.id, role="user").filter(
-        AIChat.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
-    ).count()
+    daily_limit = _wingman_daily_cap()
+    today_count = _wingman_today_count(current_user.id)
     return render_template('wingman.html', chats=chats, daily_limit=daily_limit,
                            today_count=today_count)
 
@@ -802,55 +894,50 @@ def wingman():
 @features.route('/wingman/send', methods=['POST'])
 @login_required
 def wingman_send():
-    content = request.json.get("message", "").strip() if request.is_json else ""
+    content = (request.json.get("message", "") if request.is_json else request.form.get("message", "")).strip()
     if not content:
         return jsonify({"success": False, "error": "Empty message"}), 400
+    if len(content) > 4000:
+        return jsonify({"success": False, "error": "Message too long (max 4000 chars)"}), 400
 
-    # Check daily limit
-    tier_limits = {"bronze": 5, "silver": 15, "gold": 30, "platinum": 100}
-    daily_limit = tier_limits.get(current_user.tier, 5)
-    today_count = AIChat.query.filter_by(user_id=current_user.id, role="user").filter(
-        AIChat.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
-    ).count()
+    daily_limit = _wingman_daily_cap()
+    today_count = _wingman_today_count(current_user.id)
     if today_count >= daily_limit:
-        return jsonify({"success": False, "error": f"Daily limit reached ({daily_limit} messages). Upgrade your tier for more."}), 429
+        return jsonify({"success": False, "error": f"Daily Wingman cap reached ({daily_limit}). Resets at midnight UTC."}), 429
 
-    # Save user message
     user_msg = AIChat(user_id=current_user.id, role="user", content=content)
     db.session.add(user_msg)
     db.session.commit()
 
-    # Try Anthropic API
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key or "REPLACE" in api_key or "placeholder" in api_key:
-        reply = "AI Wingman is being configured. Check back soon! For now, keep grinding."
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key or "placeholder" in api_key.lower() or "replace" in api_key.lower():
+        reply = "AI Wingman isn't configured yet. The owner will plug in the Anthropic key shortly — keep grinding in the meantime."
     else:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
-            # Get recent conversation context
+            model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
             recent = AIChat.query.filter_by(user_id=current_user.id).order_by(
-                AIChat.created_at.desc()).limit(10).all()
+                AIChat.created_at.desc()).limit(20).all()
             recent.reverse()
-            messages = []
-            for c in recent:
-                messages.append({"role": c.role, "content": c.content})
+            messages = [{"role": c.role, "content": c.content} for c in recent]
+
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=500,
-                system="You are the AI Wingman for the Anti-Billionaires Men's Club. You help members with business strategy, mindset, productivity, and accountability. Keep responses concise and actionable. You have a confident, supportive tone.",
-                messages=messages
+                model=model,
+                max_tokens=1024,
+                system=WINGMAN_SYSTEM_PROMPT,
+                messages=messages,
             )
             reply = response.content[0].text
         except Exception as e:
-            reply = "AI Wingman encountered an error. Try again in a moment."
+            print(f"[WINGMAN ERROR] {e}")
+            reply = "Wingman hit an error. Try again in a moment."
 
-    # Save assistant reply
     asst_msg = AIChat(user_id=current_user.id, role="assistant", content=reply)
     db.session.add(asst_msg)
     db.session.commit()
 
-    return jsonify({"success": True, "reply": reply})
+    return jsonify({"success": True, "reply": reply, "remaining": max(0, daily_limit - today_count - 1)})
 
 
 # =====================================================================

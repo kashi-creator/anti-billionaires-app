@@ -1,0 +1,27 @@
+{
+  "name": "sovereign-society",
+  "version": "1.0.0",
+  "description": "Native iOS/Android wrappers for Sovereign Society (Capacitor)",
+  "scripts": {
+    "cap:sync": "npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android",
+    "cap:run:ios": "npx cap run ios",
+    "cap:run:android": "npx cap run android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.0",
+    "@capacitor/share": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "@capacitor-community/biometric-auth": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0"
+  }
+}

@@ -1,0 +1,11 @@
+Hi {{ referrer.name }},
+
+{{ referee.name }} just made their 6th payment. They're now a permanent qualified referral on your account.
+
+{{ qualified_count }} of {{ threshold }} qualified referrals.
+
+{% if remaining > 0 %}{{ remaining }} more qualified referral{% if remaining != 1 %}s{% endif %} and your billing stops forever.{% else %}You hit the threshold — separate email coming with your lifetime access details.{% endif %}
+
+View your referrals: {{ url_for('features.referrals', _external=True) }}
+
+— Sovereign Society

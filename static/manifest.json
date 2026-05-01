@@ -1,0 +1,18 @@
+{
+  "name": "Sovereign Society",
+  "short_name": "Sovereign",
+  "description": "Private network for sovereign men: deal flow, accountability, brotherhood.",
+  "start_url": "/feed",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/uploads/.gitkeep",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

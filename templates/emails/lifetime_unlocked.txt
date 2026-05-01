@@ -1,0 +1,9 @@
+{{ user.name }},
+
+You did it.
+
+Three of your referrals have hit their 6-month mark. Your billing stops today. Your access is permanent.
+
+You built this seat at the table the right way — by bringing in three other operators who showed up.
+
+— Sovereign Society

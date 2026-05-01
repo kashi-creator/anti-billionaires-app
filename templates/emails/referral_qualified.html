@@ -1,0 +1,19 @@
+{% extends "emails/_layout.html" %}
+{% block content %}
+<h1 style="font-family:Georgia,serif;font-size:24px;color:#D4AF37;margin:0 0 16px 0;">{{ referee.name }} just qualified.</h1>
+<p>Hi {{ referrer.name }} — your referral <strong style="color:#fff;">{{ referee.name }}</strong> just made their 6th payment. They're now a permanent qualified referral on your account.</p>
+
+<div style="background:#1a1a1a;border:1px solid #2a2a2a;padding:24px;margin:32px 0;border-radius:6px;text-align:center;">
+  <div style="font-family:Georgia,serif;font-size:48px;color:#D4AF37;line-height:1;margin-bottom:8px;">{{ qualified_count }} <span style="color:#666;">/</span> {{ threshold }}</div>
+  <div style="color:#888;font-size:13px;letter-spacing:2px;text-transform:uppercase;">qualified referrals</div>
+  {% if remaining > 0 %}
+  <p style="margin-top:24px;color:#ccc;font-size:14px;">
+    {{ remaining }} more qualified referral{{ 's' if remaining != 1 else '' }} and your billing stops forever.
+  </p>
+  {% endif %}
+</div>
+
+<p style="margin:32px 0 0 0;text-align:center;">
+  <a href="{{ url_for('features.referrals', _external=True) }}" style="display:inline-block;background:#D4AF37;color:#0A0A0A;padding:14px 32px;text-decoration:none;font-weight:bold;letter-spacing:2px;text-transform:uppercase;font-size:13px;border-radius:4px;">View your referrals</a>
+</p>
+{% endblock %}

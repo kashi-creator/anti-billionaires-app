@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div style="max-width:760px;margin:60px auto;padding:0 24px;color:#ccc;font-family:Georgia,serif;line-height:1.7;">
+  <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;font-size:48px;margin-bottom:8px;">{{ title }}</h1>
+  <p style="color:#666;font-size:13px;margin-bottom:48px;">Last updated: April 2026</p>
+
+  {% if body_template == 'legal_terms' %}
+    <p><em>This is a placeholder. Have a lawyer review before launch.</em></p>
+    <h2 style="color:#fff;margin-top:32px;">1. Acceptance of Terms</h2>
+    <p>By creating an account or paying for membership at Sovereign Society, you agree to these terms.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">2. Membership</h2>
+    <p>Membership is $99/month for 3 months, after which lifetime access is granted at no further charge. You may cancel before the third payment to end your membership; in that case, access ends at the close of the current billing period.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">3. Refund Policy</h2>
+    <p>Memberships are non-refundable except where required by law. Contact support for hardship cases.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">4. Conduct</h2>
+    <p>Members agree to engage respectfully. Harassment, illegal activity, scams, and spam are prohibited and result in removal without refund.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">5. Content</h2>
+    <p>You retain ownership of content you post. You grant us a license to display it within the platform.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">6. Termination</h2>
+    <p>We reserve the right to terminate accounts violating these terms.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">7. Limitation of Liability</h2>
+    <p>The Society is provided "as is." We are not liable for outcomes resulting from advice, deals, or interactions between members.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">8. Contact</h2>
+    <p>Questions: <a href="mailto:support@onepercentmensclub.com" style="color:#D4AF37;">support@onepercentmensclub.com</a></p>
+
+  {% elif body_template == 'legal_privacy' %}
+    <p><em>This is a placeholder. Have a lawyer review before launch.</em></p>
+    <h2 style="color:#fff;margin-top:32px;">Information We Collect</h2>
+    <p>Email, name, profile photo, location (city/country/optional coordinates), payment info (handled by Stripe; we never store card numbers), and content you post.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">How We Use It</h2>
+    <p>To operate the Society, send transactional and engagement emails (you can opt out of digests), and prevent fraud.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">Sharing</h2>
+    <p>We do not sell data. We share with: Stripe (payment), Resend (email), and Anthropic (when you use AI Wingman). All are bound by their own privacy policies.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">Your Rights</h2>
+    <p>You may request your data or account deletion by emailing <a href="mailto:support@onepercentmensclub.com" style="color:#D4AF37;">support@onepercentmensclub.com</a>.</p>
+
+    <h2 style="color:#fff;margin-top:32px;">Cookies</h2>
+    <p>We use a session cookie for authentication and a remember-me cookie for convenience. No third-party tracking cookies.</p>
+  {% endif %}
+
+  <p style="margin-top:64px;"><a href="{{ url_for('index') }}" style="color:#D4AF37;">← Back</a></p>
+</div>
+{% endblock %}

@@ -46,6 +46,33 @@ class User(UserMixin, db.Model):
     has_seen_welcome_video = db.Column(db.Boolean, default=False)
     email_digest_opt_out = db.Column(db.Boolean, default=False)
 
+    # Email verification
+    email_verified = db.Column(db.Boolean, default=False, nullable=False)
+    email_verify_token = db.Column(db.String(64), default=None, index=True)
+    email_verify_expires = db.Column(db.DateTime, default=None)
+
+    # Password reset
+    password_reset_token = db.Column(db.String(64), default=None, index=True)
+    password_reset_expires = db.Column(db.DateTime, default=None)
+
+    # Billing & referral-based lifetime access (Phase 4)
+    # payments_made_count: how many successful $99 payments THIS user has made.
+    #   Counts toward their referrer's qualification at 6.
+    # qualified_referrals_count: how many of THIS user's referrals have hit 6 payments.
+    #   At 3, this user gets lifetime_access.
+    # lifetime_access: stops future billing, keeps access forever.
+    payments_made_count = db.Column(db.Integer, default=0, nullable=False)
+    qualified_referrals_count = db.Column(db.Integer, default=0, nullable=False)
+    lifetime_access = db.Column(db.Boolean, default=False, nullable=False)
+    lifetime_qualified_at = db.Column(db.DateTime, default=None)
+
+    # Onboarding (Phase 6)
+    onboarding_complete = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Email throttling (Phase 8) — last time we sent any engagement email to this user
+    last_engagement_email_at = db.Column(db.DateTime, default=None)
+    last_digest_sent_at = db.Column(db.DateTime, default=None)
+
     posts = db.relationship("Post", backref="author", lazy=True, cascade="all, delete-orphan",
                             foreign_keys="Post.user_id")
     comments = db.relationship("Comment", backref="author", lazy=True, cascade="all, delete-orphan")
@@ -93,6 +120,8 @@ class User(UserMixin, db.Model):
     @property
     def has_active_subscription(self):
         if self.is_admin:
+            return True
+        if self.lifetime_access:
             return True
         return self.subscription_status == "active"
 
@@ -910,6 +939,26 @@ class CallBooking(db.Model):
 
 
 # ============ ACTIVITY FEED ============
+
+class StripeEvent(db.Model):
+    """Idempotency log for Stripe webhook events."""
+    __tablename__ = "stripe_event"
+    id = db.Column(db.Integer, primary_key=True)
+    stripe_event_id = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    event_type = db.Column(db.String(80), nullable=False)
+    received_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class DeviceToken(db.Model):
+    """Push notification tokens registered by native iOS/Android apps."""
+    __tablename__ = "device_token"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    token = db.Column(db.String(500), nullable=False, unique=True, index=True)
+    platform = db.Column(db.String(20), nullable=False)  # 'ios' or 'android'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
 
 class Activity(db.Model):
     id = db.Column(db.Integer, primary_key=True)

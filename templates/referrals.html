@@ -1,51 +1,345 @@
 {% extends "base.html" %}
-{% block title %}Referrals{% endblock %}
+{% block title %}Your Referrals{% endblock %}
 
 {% block content %}
-<div class="page-container page-narrow">
-    <h1>Your Referral Program</h1>
+<style>
+  .ref-wrap { max-width: 880px; margin: 32px auto; padding: 0 24px; }
 
-    <div class="card" style="margin-top:1.5rem">
-        <h3 style="color:var(--gold);margin-bottom:1rem">Share Your Link</h3>
-        <p style="color:var(--text-secondary);margin-bottom:1rem">Invite others to join the The 1% Men's Club. When they sign up, you both earn bonus points.</p>
-        <div class="referral-link-box">
-            <input type="text" id="refLink" readonly value="{{ request.host_url.rstrip('/') }}/r/{{ referral_code }}" class="input-field" style="flex:1">
-            <button class="btn btn-gold btn-sm" onclick="copyRefLink()">Copy</button>
-        </div>
-        <p id="copyMsg" style="color:var(--success);margin-top:0.5rem;display:none">Copied!</p>
+  /* Hero progress */
+  .ref-hero {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px;
+    padding: 56px 48px; text-align: center; margin-bottom: 32px;
+    position: relative; overflow: hidden;
+  }
+  .ref-hero::before {
+    content:""; position:absolute; inset:0;
+    background: radial-gradient(ellipse at top, rgba(212,175,55,0.10), transparent 70%);
+    pointer-events:none;
+  }
+  .ref-eyebrow { font-size:11px; letter-spacing:6px; text-transform:uppercase; color:#888; margin-bottom:16px; }
+  .ref-counter {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(72px, 12vw, 120px); line-height: 1; color: #D4AF37;
+    margin: 0 0 8px 0; letter-spacing: -2px;
+  }
+  .ref-counter .slash { color: #444; margin: 0 8px; }
+  .ref-counter .total { color: #555; }
+  .ref-counter-label { font-size:14px; letter-spacing:3px; text-transform:uppercase; color:#aaa; margin-bottom:32px; }
+
+  .ref-progress-bar {
+    width: 100%; height: 6px; background: #1f1f1f; border-radius: 3px; overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .ref-progress-fill {
+    height: 100%; background: linear-gradient(90deg, #D4AF37, #B8941F);
+    transition: width 0.6s ease;
+  }
+  .ref-tagline {
+    color: #ccc; font-size: 17px; line-height: 1.6; max-width: 520px; margin: 0 auto;
+  }
+  .ref-tagline strong { color: #D4AF37; }
+
+  .ref-lifetime-badge {
+    display: inline-block; padding: 8px 24px; background: #D4AF37; color: #0A0A0A;
+    font-weight: bold; letter-spacing: 4px; text-transform: uppercase; font-size: 12px;
+    border-radius: 4px; margin-bottom: 24px;
+  }
+
+  /* Share section */
+  .ref-share-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px;
+    padding: 32px; margin-bottom: 32px;
+  }
+  .ref-share-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px; color: #fff; margin: 0 0 8px 0;
+  }
+  .ref-share-sub { color: #888; font-size: 14px; margin-bottom: 24px; }
+
+  .ref-link-row {
+    display: flex; gap: 8px; margin-bottom: 20px;
+  }
+  .ref-link-input {
+    flex: 1; padding: 14px 16px; background: #0a0a0a; border: 1px solid #2a2a2a;
+    color: #fff; font-size: 14px; border-radius: 6px; font-family: 'SF Mono', Menlo, monospace;
+  }
+  .ref-link-input:focus { outline: none; border-color: #D4AF37; }
+  .ref-copy-btn {
+    padding: 14px 24px; background: #D4AF37; color: #0A0A0A; border: none;
+    border-radius: 6px; font-weight: bold; letter-spacing: 1px; cursor: pointer;
+    font-size: 13px; text-transform: uppercase;
+  }
+  .ref-copy-btn:hover { background: #B8941F; }
+  .ref-copy-btn.copied { background: #1f1f1f; color: #D4AF37; }
+
+  .ref-share-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ref-share-btn {
+    padding: 10px 16px; background: #0a0a0a; border: 1px solid #2a2a2a;
+    color: #ccc; text-decoration: none; border-radius: 6px;
+    font-size: 13px; transition: all 0.2s;
+  }
+  .ref-share-btn:hover { border-color: #D4AF37; color: #D4AF37; }
+
+  .ref-script {
+    background: #0a0a0a; border: 1px solid #2a2a2a; padding: 16px;
+    border-radius: 6px; color: #ccc; font-size: 14px; line-height: 1.6;
+    margin-top: 16px;
+    font-style: italic;
+  }
+
+  /* Stats row */
+  .ref-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .ref-stat {
+    background: #111; border: 1px solid #1f1f1f; border-radius: 8px; padding: 20px; text-align: center;
+  }
+  .ref-stat-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 36px; line-height: 1; color: #fff;
+  }
+  .ref-stat-num.gold { color: #D4AF37; }
+  .ref-stat-num.muted { color: #555; }
+  .ref-stat-label {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #888;
+    margin-top: 8px;
+  }
+
+  /* Referral list */
+  .ref-list-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px; padding: 32px;
+  }
+  .ref-list-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px; color: #fff; margin: 0 0 24px 0;
+  }
+  .ref-row {
+    display: grid; grid-template-columns: 48px 1fr auto;
+    gap: 16px; align-items: center; padding: 16px 0;
+    border-bottom: 1px solid #1f1f1f;
+  }
+  .ref-row:last-child { border-bottom: none; }
+  .ref-avatar {
+    width: 48px; height: 48px; border-radius: 50%; background: #0a0a0a;
+    display: flex; align-items: center; justify-content: center;
+    color: #D4AF37; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px;
+    border: 1px solid #2a2a2a; overflow: hidden;
+  }
+  .ref-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ref-row-meta strong { color: #fff; display: block; }
+  .ref-row-meta .joined { color: #666; font-size: 12px; }
+  .ref-row-progress {
+    margin-top: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .ref-row-bar {
+    width: 120px; height: 4px; background: #1f1f1f; border-radius: 2px; overflow: hidden;
+  }
+  .ref-row-bar-fill {
+    height: 100%; background: linear-gradient(90deg, #D4AF37, #B8941F);
+  }
+  .ref-row-bar.churned .ref-row-bar-fill { background: #444; }
+  .ref-row-text { font-size: 12px; color: #aaa; }
+  .ref-row-text.qualified { color: #D4AF37; font-weight: bold; }
+  .ref-row-text.churned { color: #666; }
+
+  .ref-tag {
+    padding: 4px 10px; border-radius: 4px; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase; font-weight: bold;
+  }
+  .ref-tag.qualified { background: rgba(212,175,55,0.15); color: #D4AF37; }
+  .ref-tag.paying { background: rgba(255,255,255,0.06); color: #ccc; }
+  .ref-tag.churned { background: rgba(100,100,100,0.15); color: #666; }
+
+  .ref-empty {
+    text-align: center; padding: 48px 24px; color: #666;
+  }
+  .ref-empty-emoji { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+</style>
+
+<div class="ref-wrap">
+
+  <!-- HERO PROGRESS -->
+  <div class="ref-hero">
+    {% if has_lifetime %}
+      <span class="ref-lifetime-badge">Lifetime Member</span>
+      <div class="ref-eyebrow">You earned your seat</div>
+      <div class="ref-counter" style="font-size:64px;">{{ qualified_count }}<span class="slash">/</span><span class="total">{{ threshold }}</span></div>
+      <p class="ref-tagline">
+        You've stopped paying. Your access is permanent. Keep recruiting if you want — every member you bring strengthens the Society.
+      </p>
+    {% else %}
+      <div class="ref-eyebrow">Your path to lifetime access</div>
+      <div class="ref-counter">{{ qualified_count }}<span class="slash">/</span><span class="total">{{ threshold }}</span></div>
+      <div class="ref-counter-label">qualified referrals</div>
+      <div class="ref-progress-bar">
+        <div class="ref-progress-fill" style="width: {{ progress_pct }}%;"></div>
+      </div>
+      {% if remaining_to_lifetime == 0 %}
+        <p class="ref-tagline"><strong>You're at the threshold.</strong> Lifetime access activating shortly.</p>
+      {% elif remaining_to_lifetime == 1 %}
+        <p class="ref-tagline">
+          <strong>One more qualified referral and you're done paying — forever.</strong>
+        </p>
+      {% else %}
+        <p class="ref-tagline">
+          Refer {{ threshold }} members who each stay for {{ payments_to_qualify }} months and your billing stops <strong>permanently</strong>.
+          {% if qualified_count == 0 %}You haven't started yet.{% endif %}
+        </p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <!-- STATS ROW -->
+  <div class="ref-stats">
+    <div class="ref-stat">
+      <div class="ref-stat-num gold">{{ qualified_count }}</div>
+      <div class="ref-stat-label">Qualified</div>
+    </div>
+    <div class="ref-stat">
+      <div class="ref-stat-num">{{ paying_count }}</div>
+      <div class="ref-stat-label">Paying (in progress)</div>
+    </div>
+    <div class="ref-stat">
+      <div class="ref-stat-num muted">{{ churned_count }}</div>
+      <div class="ref-stat-label">Churned</div>
+    </div>
+  </div>
+
+  <!-- SHARE CARD -->
+  {% if not has_lifetime %}
+  <div class="ref-share-card">
+    <h2 class="ref-share-title">Your referral link</h2>
+    <p class="ref-share-sub">Share this anywhere. Anyone who signs up through it counts toward your lifetime.</p>
+
+    <div class="ref-link-row">
+      <input type="text" id="refLink" readonly value="{{ referral_url }}" class="ref-link-input">
+      <button class="ref-copy-btn" id="copyBtn" onclick="copyRefLink()">Copy</button>
     </div>
 
-    <div class="card" style="margin-top:1.5rem">
-        <h3 style="margin-bottom:1rem">Your Referrals ({{ referred|length }})</h3>
-        {% for user in referred %}
-        <div class="convo-card" style="margin-bottom:0.5rem">
-            <div class="avatar avatar-sm">
-                {% if user.profile_photo %}
-                <img src="{{ url_for('static', filename=user.profile_photo) }}" alt="">
-                {% else %}
-                <span>{{ user.name[0]|upper }}</span>
-                {% endif %}
-            </div>
-            <div>
-                <strong>{{ user.name }}</strong>
-                <span class="post-time">Joined {{ user.created_at.strftime('%b %d, %Y') }}</span>
-            </div>
-        </div>
-        {% else %}
-        <p style="color:var(--text-muted)">No referrals yet. Share your link to get started!</p>
-        {% endfor %}
+    {% set share_x = "Just joined a private society — operators, accountability, deal flow. " ~ referral_url %}
+    {% set share_sms = "Check this out — Sovereign Society. Private network for operators. " ~ referral_url %}
+    {% set share_wa = "Joined this private operator society — thought of you. " ~ referral_url %}
+    {% set share_email_subject = "Sovereign Society" %}
+    {% set share_email_body = "Found a private network you might want to be part of — operators, accountability, deal flow.\n\n" ~ referral_url ~ "\n\nGo through this link if you join." %}
+
+    <div class="ref-share-buttons">
+      <a class="ref-share-btn" id="shareNative" href="#" onclick="nativeShare(); return false;" style="display:none;">Share…</a>
+      <a class="ref-share-btn" target="_blank" rel="noopener"
+         href="https://twitter.com/intent/tweet?text={{ share_x | urlencode }}">
+        Post on X
+      </a>
+      <a class="ref-share-btn"
+         href="sms:?&body={{ share_sms | urlencode }}">
+        iMessage / SMS
+      </a>
+      <a class="ref-share-btn" target="_blank" rel="noopener"
+         href="https://wa.me/?text={{ share_wa | urlencode }}">
+        WhatsApp
+      </a>
+      <a class="ref-share-btn"
+         href="mailto:?subject={{ share_email_subject | urlencode }}&body={{ share_email_body | urlencode }}">
+        Email
+      </a>
     </div>
+
+    <details style="margin-top:20px;">
+      <summary style="color:#D4AF37;cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Suggested message</summary>
+      <div class="ref-script" id="suggestedMsg">Joined a private network called Sovereign Society — operators, accountability, deal flow. Real people, no LinkedIn vibes. Go through this if you check it out: {{ referral_url }}</div>
+      <button class="ref-share-btn" style="margin-top:8px;" onclick="copySuggested()">Copy message</button>
+    </details>
+  </div>
+  {% endif %}
+
+  <!-- REFERRAL LIST -->
+  <div class="ref-list-card">
+    <h2 class="ref-list-title">Your referrals
+      {% if referred|length %}
+      <span style="color:#666;font-size:18px;">({{ referred|length }})</span>
+      {% endif %}
+    </h2>
+
+    {% if referred %}
+      {% for r in referred %}
+      <div class="ref-row">
+        <div class="ref-avatar">
+          {% if r.user.profile_photo %}
+            <img src="{{ url_for('static', filename=r.user.profile_photo) }}" alt="">
+          {% else %}
+            {{ r.user.name[0]|upper }}
+          {% endif %}
+        </div>
+        <div class="ref-row-meta">
+          <strong>{{ r.user.name }}</strong>
+          <span class="joined">Joined {{ r.user.created_at.strftime('%b %d, %Y') }}</span>
+          <div class="ref-row-progress">
+            <div class="ref-row-bar {% if r.is_churned %}churned{% endif %}">
+              <div class="ref-row-bar-fill" style="width: {{ r.progress_pct }}%;"></div>
+            </div>
+            <span class="ref-row-text {% if r.is_qualified %}qualified{% elif r.is_churned %}churned{% endif %}">
+              {% if r.is_qualified %}
+                Qualified
+              {% elif r.is_churned %}
+                Canceled at {{ r.payments_made }}/{{ r.payments_to_qualify }}
+              {% else %}
+                {{ r.payments_made }}/{{ r.payments_to_qualify }} payments
+              {% endif %}
+            </span>
+          </div>
+        </div>
+        <div>
+          {% if r.is_qualified %}
+            <span class="ref-tag qualified">Qualified</span>
+          {% elif r.is_churned %}
+            <span class="ref-tag churned">Churned</span>
+          {% else %}
+            <span class="ref-tag paying">In progress</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="ref-empty">
+        <div class="ref-empty-emoji">—</div>
+        <p>No referrals yet. Share your link to start your path to lifetime access.</p>
+      </div>
+    {% endif %}
+  </div>
+
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 function copyRefLink() {
-    const input = document.getElementById('refLink');
-    input.select();
-    navigator.clipboard.writeText(input.value);
-    document.getElementById('copyMsg').style.display = 'block';
-    setTimeout(() => document.getElementById('copyMsg').style.display = 'none', 2000);
+  const input = document.getElementById('refLink');
+  const btn = document.getElementById('copyBtn');
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+function copySuggested() {
+  const msg = document.getElementById('suggestedMsg').innerText;
+  navigator.clipboard.writeText(msg);
+  event.target.textContent = '✓ Copied';
+  setTimeout(() => { event.target.textContent = 'Copy message'; }, 1800);
+}
+
+function nativeShare() {
+  if (navigator.share) {
+    navigator.share({
+      title: "Sovereign Society",
+      text: "Joined a private operator's network. Check it out:",
+      url: "{{ referral_url }}"
+    });
+  }
+}
+
+if (navigator.share) {
+  const btn = document.getElementById('shareNative');
+  if (btn) btn.style.display = 'inline-block';
 }
 </script>
 {% endblock %}

@@ -1,0 +1,31 @@
+{% extends "emails/_layout.html" %}
+{% block content %}
+<h1 style="font-family:Georgia,serif;font-size:24px;color:#D4AF37;margin:0 0 16px 0;">This week at Sovereign Society</h1>
+<p>Hi {{ user.name }} — here's what you're missing.</p>
+
+{% if top_wins %}
+<h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">Top wins</h2>
+{% for w in top_wins %}
+<p style="margin:0 0 12px 0;font-size:15px;"><strong style="color:#D4AF37;">{{ w.author_name }}:</strong> {{ w.content }}</p>
+{% endfor %}
+{% endif %}
+
+{% if spotlight %}
+<h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">Member spotlight</h2>
+<p><strong>{{ spotlight.name }}</strong> — {{ spotlight.bio[:200] }}</p>
+{% endif %}
+
+{% if upcoming_events %}
+<h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">This week</h2>
+{% for e in upcoming_events %}
+<p style="margin:0 0 8px 0;"><strong>{{ e.date }}</strong> — {{ e.title }}</p>
+{% endfor %}
+{% endif %}
+
+<p style="margin:32px 0 0 0;text-align:center;">
+  <a href="{{ url_for('feed', _external=True) }}" style="display:inline-block;background:#D4AF37;color:#0A0A0A;padding:14px 32px;text-decoration:none;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:4px;">Open the Society</a>
+</p>
+<p style="font-size:11px;color:#666;text-align:center;margin-top:32px;">
+  <a href="{{ unsubscribe_url }}" style="color:#666;">Unsubscribe from weekly digests</a>
+</p>
+{% endblock %}

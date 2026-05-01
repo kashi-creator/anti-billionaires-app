@@ -6,10 +6,20 @@ from datetime import datetime, date
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect, generate_csrf, validate_csrf, CSRFError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 import bcrypt
+import secrets
 import stripe
 import requests
+from datetime import timedelta
+from email_send import (
+    send_email, send_welcome_verify, send_password_reset,
+    send_payment_succeeded, send_payment_failed, send_lifetime_unlocked,
+)
 from models import (
     db, User, Post, Comment, Like, Follow, Space, SpaceMembership,
     Notification, Poll, PollOption, PollVote,
@@ -20,17 +30,53 @@ from models import (
     WeeklyChallenge, ChallengeSubmission, ChallengeVote,
     Resource, ResourceUpvote, MemberGoal, AccountabilityPair, GoalCheckIn,
     Bookmark, Badge, UserBadge, Reel, SpaceChat, AIChat,
-    Availability, CallBooking, Activity,
+    Availability, CallBooking, Activity, StripeEvent, DeviceToken,
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "abmc-dev-secret-key-change-in-prod")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///abmc.db")
+
+ENV = os.environ.get("FLASK_ENV", "development")
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if ENV == "production":
+        raise RuntimeError("SECRET_KEY must be set in production")
+    SECRET_KEY = "dev-only-not-for-prod-change-me"
+    print("[WARN] Using insecure dev SECRET_KEY. Set SECRET_KEY env var for production.")
+app.config["SECRET_KEY"] = SECRET_KEY
+
+_db_url = os.environ.get("DATABASE_URL", "sqlite:///abmc.db")
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+if _db_url.startswith("postgresql://"):
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_recycle": 1800,
+    }
+
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
+
+# Session cookie hardening
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = ENV == "production"
+app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 30  # 30 days
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_SECURE"] = ENV == "production"
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+
+# CSRF: disabled by default for legacy compat; auth-critical routes opt in
+# manually via validate_csrf(). Forms can still call {{ csrf_token() }} since
+# CSRFProtect is initialized below — making templates ready for full rollout.
+app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+app.config["WTF_CSRF_TIME_LIMIT"] = None  # session-bound
 
 # Stripe config
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_placeholder")
@@ -43,19 +89,64 @@ stripe.api_key = STRIPE_SECRET_KEY
 GHL_API_KEY = os.environ.get("GHL_API_KEY", "")
 GHL_LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "")
 
-# Fix for Railway PostgreSQL URL
-if app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgres://"):
-    app.config["SQLALCHEMY_DATABASE_URI"] = app.config["SQLALCHEMY_DATABASE_URI"].replace(
-        "postgres://", "postgresql://", 1
-    )
-
 db.init_app(app)
+migrate = Migrate(app, db)
+
+csrf = CSRFProtect(app)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],  # opt-in per route via @limiter.limit
+    storage_uri="memory://",
+)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "pricing"
+
+
+@app.context_processor
+def _inject_csrf_token():
+    return {"csrf_token": generate_csrf}
+
+
+def _is_native_app_request():
+    """True when the request is coming from the Capacitor native shell.
+    Used to hide signup/checkout CTAs in the iOS app (Apple 'reader' rule).
+    Capacitor sets a custom UA prefix; we also accept an explicit X-Native header."""
+    ua = (request.user_agent.string or "").lower()
+    if request.headers.get("X-Native-App") == "1":
+        return True
+    return "capacitor" in ua or "1%mc-native" in ua or "sovereign-native" in ua
+
+
+@app.context_processor
+def _inject_native_flag():
+    try:
+        return {"is_native_app": _is_native_app_request()}
+    except RuntimeError:
+        return {"is_native_app": False}
+
+
+def require_csrf(f):
+    """Enforce CSRF on a route. Used while WTF_CSRF_CHECK_DEFAULT is False."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if request.method == "POST" and app.config.get("WTF_CSRF_ENABLED", True):
+            try:
+                validate_csrf(request.form.get("csrf_token", ""))
+            except Exception:
+                abort(400, description="Invalid or missing CSRF token")
+        return f(*args, **kwargs)
+    return wrapper
+
+
 app.register_blueprint(phase3)
 app.register_blueprint(features)
+
+from cron import cron_cli
+app.cli.add_command(cron_cli)
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
@@ -85,14 +176,39 @@ def create_notification(user_id, type, message, link=None):
     db.session.add(notif)
 
 
+def _admin_email_allowlist():
+    raw = os.environ.get("ADMIN_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
 def admin_required(f):
     @wraps(f)
     @login_required
     def decorated(*args, **kwargs):
         if not current_user.is_admin:
             abort(403)
+        # Defense in depth: if ADMIN_EMAILS env is set, require membership.
+        allowlist = _admin_email_allowlist()
+        if allowlist and current_user.email.lower() not in allowlist:
+            abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+def paywall_required(f):
+    """Block route until user has active subscription or lifetime access.
+    Stacks on @login_required; if missing access, redirect to /pricing."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for("login"))
+        if not current_user.has_active_subscription:
+            flash("Membership required to access this area.", "warning")
+            return redirect(url_for("pricing"))
+        if not current_user.onboarding_complete:
+            return redirect(url_for("onboarding"))
+        return f(*args, **kwargs)
+    return wrapper
 
 
 def subscription_required(f):
@@ -147,129 +263,335 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# Create tables on startup
+# Schema is now managed by Flask-Migrate (alembic).
+# In dev: db.create_all() bootstraps a fresh sqlite DB.
+# In prod: run `flask db upgrade` on deploy (Railway release command).
 with app.app_context():
-    db.create_all()
+    if _db_url.startswith("sqlite:"):
+        db.create_all()
     seed_checklist()
-    # Migrate existing tables: add new columns if they don't exist
-    from sqlalchemy import inspect, text
-    inspector = inspect(db.engine)
-    user_columns = [c["name"] for c in inspector.get_columns("user")]
-    if "points" not in user_columns:
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE user ADD COLUMN points INTEGER DEFAULT 0"))
-            conn.execute(text("ALTER TABLE user ADD COLUMN streak_days INTEGER DEFAULT 0"))
-            conn.execute(text("ALTER TABLE user ADD COLUMN last_login_date DATE"))
-            conn.commit()
-    # Stripe columns migration
-    if "stripe_customer_id" not in user_columns:
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE user ADD COLUMN stripe_customer_id VARCHAR(100)"))
-            conn.execute(text("ALTER TABLE user ADD COLUMN stripe_subscription_id VARCHAR(100)"))
-            conn.execute(text("ALTER TABLE user ADD COLUMN subscription_status VARCHAR(30) DEFAULT 'inactive'"))
-            conn.execute(text("ALTER TABLE user ADD COLUMN subscription_current_period_end DATETIME"))
-            conn.commit()
-    # Add space_id to post if missing
-    post_columns = [c["name"] for c in inspector.get_columns("post")]
-    if "space_id" not in post_columns:
-        with db.engine.connect() as conn:
-            conn.execute(text("ALTER TABLE post ADD COLUMN space_id INTEGER"))
-            conn.commit()
-    # New User columns migration
-    new_user_cols = {
-        "referral_code": "VARCHAR(12)",
-        "referred_by": "INTEGER",
-        "city": "VARCHAR(100)",
-        "country": "VARCHAR(100)",
-        "lat": "FLOAT",
-        "lng": "FLOAT",
-        "show_on_map": "BOOLEAN DEFAULT 1",
-        "bookings_enabled": "BOOLEAN DEFAULT 0",
-        "default_meeting_url": "VARCHAR(500)",
-        "has_seen_welcome_video": "BOOLEAN DEFAULT 0",
-        "email_digest_opt_out": "BOOLEAN DEFAULT 0",
-    }
-    for col_name, col_type in new_user_cols.items():
-        if col_name not in user_columns:
-            try:
-                with db.engine.connect() as conn:
-                    conn.execute(text(f"ALTER TABLE user ADD COLUMN {col_name} {col_type}"))
-                    conn.commit()
-            except Exception:
-                pass
     seed_badges()
 
 
-# --- Seed spaces and events ---
-@app.route("/seed-content/<secret>")
-def seed_content(secret):
-    if secret != "onepercentmc2026":
-        abort(404)
+def _seed_content():
+    """Populate spaces, events, and posts. Idempotent - checks before inserting."""
     from datetime import timedelta
+
+    # --- Ensure a system/admin user exists for authored content ---
     admin = User.query.filter_by(is_admin=True).first()
     if not admin:
-        return "No admin user found."
-    spaces_data = [
-        ("The Vault", "Exclusive inner circle for high-level strategy, deal flow, and confidential discussions.", "space-the-vault.png"),
-        ("Business Strategy Room", "Where moves are planned. Strategic discussions on scaling, acquisitions, and partnerships.", "space-business-strategy.png"),
-        ("Networking Lounge", "Connect with other members. Introductions, collaborations, and relationship building.", "space-networking-lounge.png"),
-        ("Investment Club", "Deal sharing, market analysis, crypto, real estate, and alternative investments.", "space-investment-club.png"),
-        ("Wellness & Health", "Optimize body and mind. Peptides, HRT, breathwork, meditation, fitness, longevity.", "space-wellness-health.png"),
-        ("Creator's Corner", "Content creation, brand building, social media strategy, digital media production.", "space-creators-corner.png"),
-    ]
-    created = 0
-    for name, desc, img in spaces_data:
-        if not Space.query.filter_by(name=name).first():
-            db.session.add(Space(name=name, description=desc, cover_image=img, created_by=admin.id))
-            created += 1
-    events_data = [
-        ("Weekly Mastermind Call", "Weekly group call - wins, challenges, hot seat format.", 3, "7:00 PM EST", "Zoom"),
-        ("Monthly Networking Mixer", "In-person networking in St. Pete. Drinks provided.", 14, "6:30 PM EST", "St. Petersburg, FL"),
-        ("Guest Speaker: AI Automation", "Leveraging AI agents for business automation. Live demo.", 7, "8:00 PM EST", "Zoom"),
-        ("Deal Flow Friday", "Members present investment opportunities. Pitch format with Q&A.", 5, "12:00 PM EST", "Zoom"),
-        ("Wellness Workshop: Peptides", "Deep dive into peptide therapy and longevity protocols.", 10, "7:30 PM EST", "Zoom"),
-    ]
-    ev_created = 0
-    for title, desc, days, t, loc in events_data:
-        if not Event.query.filter_by(title=title).first():
-            db.session.add(Event(title=title, description=desc, date=(datetime.utcnow() + timedelta(days=days)).date(), time=t, location=loc, host_id=admin.id))
-            ev_created += 1
-    db.session.commit()
-    return f"Seeded {created} spaces and {ev_created} events."
+        admin = User.query.first()
+    if not admin:
+        # No users at all yet - skip seeding authored content
+        return
+    admin_id = admin.id
 
-# --- One-time reset (remove after use) ---
-@app.route("/reset-pwd/<secret>")
-def reset_pwd(secret):
-    if secret != "abmc2026reset":
-        abort(404)
-    user = User.query.filter_by(email="thebreathcoachschool@gmail.com").first()
-    if user:
-        user.password_hash = bcrypt.hashpw("Swagswag1!".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        user.is_admin = True
-        user.subscription_status = "active"
-        db.session.commit()
-        return "Done. Password set and admin activated. Go login."
-    return "User not found."
+    # --- SPACES ---
+    spaces_data = [
+        ("Sovereign Wealth", "Building outside the rigged casino. Business, crypto, real assets, off-grid income streams. We build wealth they can't print away."),
+        ("Body & Iron", "Fitness, nutrition, cutting the poison. Real food, real training, real results. Your body is your first empire."),
+        ("Awake Minds", "Suppressed knowledge, psychedelics, consciousness, and our place in the cosmos. Question everything. Accept nothing at face value."),
+        ("Brotherhood Ops", "Supporting each other's businesses, referrals, accountability. We rise together or not at all."),
+        ("The Arsenal", "2A discussion, preparedness, self-defense, personal sovereignty. The ultimate safeguard of a free people."),
+        ("Red Pill Intel", "Elite corruption, trafficking, media lies, what they don't want you to see. Drag the truth into the light."),
+        ("Family & Legacy", "Raising strong children, protecting your bloodline, building generational wealth. What you build must outlast you."),
+        ("Off Grid", "Growing real food, land ownership, self-sufficiency, decentralization. Break the dependency chain."),
+    ]
+    for name, desc in spaces_data:
+        if not Space.query.filter_by(name=name).first():
+            space = Space(name=name, description=desc, created_by=admin_id)
+            db.session.add(space)
+    db.session.commit()
+
+    # --- EVENTS ---
+    today = date.today()
+    # Next Thursday
+    days_until_thursday = (3 - today.weekday()) % 7
+    if days_until_thursday == 0:
+        days_until_thursday = 7
+    next_thursday = today + timedelta(days=days_until_thursday)
+
+    # First Saturday of next month
+    if today.month == 12:
+        first_of_next = date(today.year + 1, 1, 1)
+    else:
+        first_of_next = date(today.year, today.month + 1, 1)
+    days_until_saturday = (5 - first_of_next.weekday()) % 7
+    first_saturday = first_of_next + timedelta(days=days_until_saturday)
+
+    # 3 months from now (approx)
+    summit_month = today.month + 3
+    summit_year = today.year
+    while summit_month > 12:
+        summit_month -= 12
+        summit_year += 1
+    summit_date = date(summit_year, summit_month, today.day if today.day <= 28 else 28)
+
+    events_data = [
+        ("Fire to Fire - St. Pete",
+         "Weekly brotherhood gathering. Thursday evenings at REVO Wellness. Come ready to connect, share, and build.",
+         "REVO Wellness, 155 8th St N, St. Petersburg FL",
+         next_thursday, "6:30 PM"),
+        ("Sovereign Wealth Workshop",
+         "Monthly deep-dive into building wealth outside the traditional system. Crypto, real assets, business models that can't be shut down.",
+         "", first_saturday, "2:00 PM"),
+        ("Brotherhood Summit",
+         "Quarterly gathering of the entire brotherhood. Full day of training, strategy, and connection.",
+         "", summit_date, ""),
+    ]
+    for title, desc, location, evt_date, evt_time in events_data:
+        if not Event.query.filter_by(title=title).first():
+            event = Event(title=title, description=desc, location=location,
+                          date=evt_date, time=evt_time, host_id=admin_id)
+            db.session.add(event)
+    db.session.commit()
+
+    # --- POSTS ---
+    manifesto_content = (
+        "We are living in an engineered reality. The food is poisoned, the money is fake and not worth "
+        "the paper it's printed on, history is sanitized, and our men are weak. The architects of this "
+        "system do not want you strong, sovereign, or awake. They want you medicated, dependent, and "
+        "distracted. We refuse the terms of this surrender.\n\n"
+        "This is not a political movement; it is a reclamation of masculine power. We are a brotherhood "
+        "of builders, thinkers, and protectors who have chosen to step out of the chaos and into purpose. "
+        "But we do not just complain about the dark; we build the fire.\n\n"
+        "We are here to build sovereign wealth outside their rigged casinos. We are here to empower the "
+        "men who grow real food in real soil. We are here to support each other's businesses, passions, "
+        "fitness, consciousness, and families. We are here to forge unbreakable bonds of brotherhood in "
+        "an age of profound isolation.\n\n"
+        "If you are comfortable with your life inside the matrix, stay where you are. If you are ready "
+        "to do the real work then strap in."
+    )
+
+    welcome_content = (
+        "Welcome to Sovereign Society. If you are here, you chose to wake up. "
+        "Introduce yourself - who are you, what are you building, and what are you done tolerating? "
+        "This is your brotherhood. Show up. Speak truth. Build fire."
+    )
+
+    challenge_content = (
+        "WEEKLY CHALLENGE: This week - cut one processed food from your diet entirely. Replace it "
+        "with something you grew or sourced locally. Report back Sunday with what you chose and how "
+        "it felt. The body is the first empire we reclaim."
+    )
+
+    posts_data = [
+        ("THE MANIFESTO", manifesto_content),
+        ("WELCOME", welcome_content),
+        ("WEEKLY CHALLENGE", challenge_content),
+    ]
+    for tag, content in posts_data:
+        # Use a prefix marker in content to identify seeded posts
+        marker = f"[SEED:{tag}]"
+        if not Post.query.filter(Post.content.contains(content[:80])).first():
+            post = Post(user_id=admin_id, content=content)
+            db.session.add(post)
+    db.session.commit()
+
+    print("[SEED] Content seeding complete.")
+
+
+with app.app_context():
+    try:
+        _seed_content()
+    except Exception as e:
+        # Don't block app startup if seeding fails (e.g., during migrations
+        # when schema is mid-upgrade or fresh DB without users yet).
+        print(f"[SEED] Skipped: {e}")
+
 
 # --- Routes ---
 
 @app.route("/")
 def index():
     if current_user.is_authenticated and current_user.has_active_subscription:
+        if not current_user.onboarding_complete:
+            return redirect(url_for("onboarding"))
         return redirect(url_for("feed"))
-    return redirect(url_for("pricing"))
+    if current_user.is_authenticated:
+        # Authenticated but no membership: send to pricing.
+        return redirect(url_for("pricing"))
+    return render_template("landing.html")
+
+
+@app.route("/api/devices/register", methods=["POST"])
+@login_required
+def register_device():
+    """Native apps POST {token, platform} after Capacitor push registration."""
+    payload = request.get_json(silent=True) or {}
+    token = (payload.get("token") or "").strip()
+    platform = (payload.get("platform") or "").strip().lower()
+    if not token or platform not in ("ios", "android"):
+        return jsonify({"success": False, "error": "Invalid token/platform"}), 400
+
+    existing = DeviceToken.query.filter_by(token=token).first()
+    now = datetime.utcnow()
+    if existing:
+        existing.user_id = current_user.id
+        existing.platform = platform
+        existing.last_seen_at = now
+    else:
+        db.session.add(DeviceToken(
+            user_id=current_user.id, token=token, platform=platform,
+            created_at=now, last_seen_at=now,
+        ))
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/devices/unregister", methods=["POST"])
+@login_required
+def unregister_device():
+    payload = request.get_json(silent=True) or {}
+    token = (payload.get("token") or "").strip()
+    if not token:
+        return jsonify({"success": False}), 400
+    DeviceToken.query.filter_by(user_id=current_user.id, token=token).delete()
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/preferences/digest", methods=["GET", "POST"])
+@login_required
+@require_csrf
+def toggle_digest():
+    if request.method == "POST":
+        current_user.email_digest_opt_out = not current_user.email_digest_opt_out
+        db.session.commit()
+        flash("Email preferences updated.", "success")
+        return redirect(request.referrer or url_for("feed"))
+    # GET: one-click unsubscribe link from emails toggles off and confirms
+    current_user.email_digest_opt_out = True
+    db.session.commit()
+    return render_template("digest_unsubscribed.html")
+
+
+@app.route("/terms")
+def terms():
+    return render_template("legal.html", title="Terms of Service", body_template="legal_terms")
+
+
+@app.route("/privacy")
+def privacy():
+    return render_template("legal.html", title="Privacy Policy", body_template="legal_privacy")
+
+
+ONBOARDING_STEPS = 5  # photo -> bio -> location -> spaces -> first post
+
+
+@app.route("/onboarding", methods=["GET"])
+@login_required
+def onboarding():
+    if current_user.onboarding_complete:
+        return redirect(url_for("feed"))
+    if not current_user.has_active_subscription:
+        return redirect(url_for("pricing"))
+    try:
+        step = int(request.args.get("step", 1))
+    except (TypeError, ValueError):
+        step = 1
+    step = max(1, min(step, ONBOARDING_STEPS))
+
+    spaces = Space.query.order_by(Space.id.asc()).all() if step == 4 else []
+    joined_space_ids = (
+        [m.space_id for m in SpaceMembership.query.filter_by(user_id=current_user.id).all()]
+        if step == 4 else []
+    )
+    return render_template(
+        "onboarding.html",
+        step=step,
+        total_steps=ONBOARDING_STEPS,
+        spaces=spaces,
+        joined_space_ids=joined_space_ids,
+    )
+
+
+@app.route("/onboarding", methods=["POST"])
+@login_required
+@require_csrf
+def onboarding_submit():
+    if current_user.onboarding_complete:
+        return redirect(url_for("feed"))
+    try:
+        step = int(request.form.get("step", 1))
+    except (TypeError, ValueError):
+        step = 1
+    skip = request.form.get("skip") == "1"
+
+    if step == 1 and not skip:
+        if "profile_photo" in request.files:
+            f = request.files["profile_photo"]
+            if f and f.filename:
+                path = save_upload(f)
+                if path:
+                    current_user.profile_photo = path
+                    db.session.commit()
+    elif step == 2 and not skip:
+        bio = request.form.get("bio", "").strip()
+        if bio:
+            current_user.bio = bio[:2000]
+            db.session.commit()
+    elif step == 3 and not skip:
+        city = request.form.get("city", "").strip()[:100]
+        country = request.form.get("country", "").strip()[:100]
+        lat = request.form.get("lat", "").strip()
+        lng = request.form.get("lng", "").strip()
+        if city:
+            current_user.city = city
+        if country:
+            current_user.country = country
+        try:
+            if lat and lng:
+                current_user.lat = float(lat)
+                current_user.lng = float(lng)
+        except ValueError:
+            pass
+        db.session.commit()
+    elif step == 4 and not skip:
+        chosen = request.form.getlist("space_ids")
+        for sid in chosen[:6]:
+            try:
+                space_id = int(sid)
+            except ValueError:
+                continue
+            existing = SpaceMembership.query.filter_by(user_id=current_user.id, space_id=space_id).first()
+            if not existing:
+                db.session.add(SpaceMembership(user_id=current_user.id, space_id=space_id))
+        db.session.commit()
+    elif step == 5 and not skip:
+        content = request.form.get("first_post", "").strip()
+        if content:
+            post = Post(user_id=current_user.id, content=content[:5000])
+            db.session.add(post)
+            current_user.add_points(10)
+            db.session.commit()
+
+    next_step = step + 1
+    if next_step > ONBOARDING_STEPS:
+        current_user.onboarding_complete = True
+        current_user.ensure_referral_code()
+        db.session.commit()
+        flash("Onboarding complete. Welcome to the Society.", "success")
+        return redirect(url_for("feed"))
+    return redirect(url_for("onboarding", step=next_step))
 
 
 @app.route("/feed")
 @login_required
 def feed():
+    from sqlalchemy.orm import joinedload, selectinload
     filter_type = request.args.get("filter", "all")
+    base = Post.query.options(
+        joinedload(Post.author),
+        selectinload(Post.likes),
+        selectinload(Post.comments),
+    )
     if filter_type == "following":
         following_ids = [f.followed_id for f in Follow.query.filter_by(follower_id=current_user.id).all()]
-        following_ids.append(current_user.id)  # Include own posts
-        posts = Post.query.filter(Post.user_id.in_(following_ids), Post.space_id.is_(None)).order_by(Post.created_at.desc()).all()
+        following_ids.append(current_user.id)
+        posts = base.filter(Post.user_id.in_(following_ids), Post.space_id.is_(None)).order_by(Post.created_at.desc()).limit(100).all()
     else:
-        posts = Post.query.filter(Post.space_id.is_(None)).order_by(Post.created_at.desc()).all()
+        posts = base.filter(Post.space_id.is_(None)).order_by(Post.created_at.desc()).limit(100).all()
     member_count = User.query.count()
 
     # Welcome checklist for sidebar
@@ -391,6 +713,8 @@ def delete_post(post_id):
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
+@require_csrf
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("feed"))
@@ -403,11 +727,13 @@ def login():
         if user and bcrypt.checkpw(password.encode("utf-8"), user.password_hash.encode("utf-8")):
             user.update_streak()
             db.session.commit()
-            login_user(user)
-            if user.subscription_status != "active" and not user.is_admin:
+            login_user(user, remember=True)
+            if not user.has_active_subscription:
                 logout_user()
                 flash("Your membership is inactive. Rejoin here.", "warning")
                 return redirect(url_for("pricing"))
+            if not user.onboarding_complete:
+                return redirect(url_for("onboarding"))
             return redirect(url_for("feed"))
         flash("Invalid email or password.", "error")
 
@@ -415,17 +741,13 @@ def login():
 
 
 @app.route("/signup", methods=["GET", "POST"])
+@limiter.limit("3 per minute", methods=["POST"])
+@require_csrf
 def signup():
     if current_user.is_authenticated:
         return redirect(url_for("feed"))
 
-    # Only accessible via founder code or Stripe success
-    is_founder = request.args.get("founder") == "true"
     prefilled_email = request.args.get("email", "").strip().lower()
-
-    if not is_founder:
-        # Regular visitors who hit /signup directly go to pricing
-        return redirect(url_for("pricing"))
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -435,19 +757,19 @@ def signup():
 
         if not name or not email or not password:
             flash("All fields are required.", "error")
-            return render_template("signup.html", email=email, founder_mode=True)
+            return render_template("signup.html", email=email)
 
         if password != confirm:
             flash("Passwords do not match.", "error")
-            return render_template("signup.html", email=email, founder_mode=True)
+            return render_template("signup.html", email=email)
 
-        if len(password) < 6:
-            flash("Password must be at least 6 characters.", "error")
-            return render_template("signup.html", email=email, founder_mode=True)
+        if len(password) < 10:
+            flash("Password must be at least 10 characters.", "error")
+            return render_template("signup.html", email=email)
 
         if User.query.filter_by(email=email).first():
             flash("Email already registered.", "error")
-            return render_template("signup.html", email=email, founder_mode=True)
+            return render_template("signup.html", email=email)
 
         hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -465,20 +787,16 @@ def signup():
             points=0,
             streak_days=1,
             last_login_date=date.today(),
-            subscription_status="active",
-            is_admin=True,
         )
         db.session.add(user)
         db.session.commit()
-        login_user(user)
 
-        # GHL: tag Founder
-        ghl_upsert_contact(email, name, tags=["Founder", "ABMC"])
+        ghl_upsert_contact(email, name, tags=["ABMC"])
 
-        flash("Welcome to the club, Founder.", "success")
-        return redirect(url_for("feed"))
+        flash("Account created. Complete your membership to gain access.", "success")
+        return redirect(url_for("pricing"))
 
-    return render_template("signup.html", email=prefilled_email, founder_mode=True)
+    return render_template("signup.html", email=prefilled_email)
 
 
 @app.route("/logout")
@@ -486,6 +804,99 @@ def signup():
 def logout():
     logout_user()
     return redirect(url_for("login"))
+
+
+# ===== Password reset =====
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("3 per minute", methods=["POST"])
+@require_csrf
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.password_reset_token = secrets.token_urlsafe(32)
+            user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+            db.session.commit()
+            reset_url = url_for("reset_password", token=user.password_reset_token, _external=True)
+            send_password_reset(user, reset_url)
+        # Always show same message to prevent email enumeration.
+        flash("If that email is registered, a reset link is on its way.", "success")
+        return redirect(url_for("login"))
+    return render_template("forgot_password.html")
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+@limiter.limit("5 per minute", methods=["POST"])
+@require_csrf
+def reset_password(token):
+    user = User.query.filter_by(password_reset_token=token).first()
+    if not user or not user.password_reset_expires or user.password_reset_expires < datetime.utcnow():
+        flash("Reset link is invalid or expired. Request a new one.", "error")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+        if len(password) < 10:
+            flash("Password must be at least 10 characters.", "error")
+            return render_template("reset_password.html", token=token)
+        if password != confirm:
+            flash("Passwords do not match.", "error")
+            return render_template("reset_password.html", token=token)
+        user.password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.session.commit()
+        flash("Password updated. Sign in with your new password.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html", token=token)
+
+
+# ===== Email verification =====
+
+def _issue_verify_token(user):
+    user.email_verify_token = secrets.token_urlsafe(32)
+    user.email_verify_expires = datetime.utcnow() + timedelta(days=7)
+    db.session.commit()
+    return user.email_verify_token
+
+
+def send_verification_email(user):
+    token = _issue_verify_token(user)
+    verify_url = url_for("verify_email", token=token, _external=True)
+    send_welcome_verify(user, verify_url)
+
+
+@app.route("/verify-email/<token>")
+def verify_email(token):
+    user = User.query.filter_by(email_verify_token=token).first()
+    if not user or not user.email_verify_expires or user.email_verify_expires < datetime.utcnow():
+        flash("Verification link is invalid or expired.", "error")
+        return redirect(url_for("login"))
+    user.email_verified = True
+    user.email_verify_token = None
+    user.email_verify_expires = None
+    db.session.commit()
+    flash("Email confirmed. Welcome.", "success")
+    if current_user.is_authenticated:
+        return redirect(url_for("feed"))
+    return redirect(url_for("login"))
+
+
+@app.route("/resend-verification", methods=["POST"])
+@login_required
+@limiter.limit("3 per hour")
+@require_csrf
+def resend_verification():
+    if current_user.email_verified:
+        flash("Email already verified.", "success")
+    else:
+        send_verification_email(current_user)
+        flash("Verification email sent.", "success")
+    return redirect(request.referrer or url_for("feed"))
 
 
 @app.route("/profile/<int:user_id>")
@@ -812,8 +1223,8 @@ def pricing():
 @app.route("/validate-code", methods=["POST"])
 def validate_code():
     code = request.json.get("code", "")
-    founder_code = os.environ.get("FOUNDER_CODE", "ABMC2026")
-    if code == founder_code:
+    founder_codes = os.environ.get("FOUNDER_CODES", os.environ.get("FOUNDER_CODE", "ABMC2026")).split(",")
+    if code.strip() in [c.strip() for c in founder_codes]:
         return jsonify({"valid": True})
     return jsonify({"valid": False})
 
@@ -856,6 +1267,7 @@ def create_checkout_session():
 
 
 @app.route("/subscription/success", methods=["GET", "POST"])
+@require_csrf
 def subscription_success():
     session_id = request.args.get("session_id")
     if not session_id:
@@ -864,7 +1276,8 @@ def subscription_success():
     try:
         stripe_session = stripe.checkout.Session.retrieve(session_id)
         sub = stripe.Subscription.retrieve(stripe_session.subscription)
-        email = stripe_session.metadata.get("email", stripe_session.customer_details.email if stripe_session.customer_details else "")
+        email = stripe_session.metadata.get("email") or (stripe_session.customer_details.email if stripe_session.customer_details else "")
+        email = (email or "").strip().lower()
         stripe_customer_id = stripe_session.customer
         stripe_subscription_id = sub.id
         period_end = datetime.utcfromtimestamp(sub.current_period_end)
@@ -872,11 +1285,18 @@ def subscription_success():
         flash("Could not verify your payment. Please contact support.", "error")
         return redirect(url_for("pricing"))
 
-    # If user already exists with this email (e.g. page refresh after account creation), log them in
+    # If user already exists with this email, log them in (handles page refresh).
     existing_user = User.query.filter_by(email=email).first()
     if existing_user:
-        login_user(existing_user)
-        return redirect(url_for("feed"))
+        # Backfill stripe info if missing (webhook may have arrived first).
+        if not existing_user.stripe_customer_id:
+            existing_user.stripe_customer_id = stripe_customer_id
+            existing_user.stripe_subscription_id = stripe_subscription_id
+            existing_user.subscription_status = "active"
+            existing_user.subscription_current_period_end = period_end
+            db.session.commit()
+        login_user(existing_user, remember=True)
+        return redirect(url_for("onboarding") if not existing_user.onboarding_complete else url_for("feed"))
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -886,22 +1306,19 @@ def subscription_success():
         if not name or not password:
             flash("Name and password are required.", "error")
             return render_template("signup.html", email=email, session_id=session_id, stripe_mode=True)
-
         if password != confirm:
             flash("Passwords do not match.", "error")
             return render_template("signup.html", email=email, session_id=session_id, stripe_mode=True)
-
-        if len(password) < 6:
-            flash("Password must be at least 6 characters.", "error")
+        if len(password) < 10:
+            flash("Password must be at least 10 characters.", "error")
             return render_template("signup.html", email=email, session_id=session_id, stripe_mode=True)
 
         hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
         profile_photo = None
         if "profile_photo" in request.files:
-            file = request.files["profile_photo"]
-            if file.filename:
-                profile_photo = save_upload(file)
+            f = request.files["profile_photo"]
+            if f.filename:
+                profile_photo = save_upload(f)
 
         user = User(
             name=name,
@@ -918,19 +1335,26 @@ def subscription_success():
         )
         db.session.add(user)
         db.session.commit()
-        login_user(user)
+        login_user(user, remember=True)
 
-        # GHL: tag Paid Member
-        ghl_upsert_contact(email, name, tags=["Paid Member", "ABMC"])
+        # Trigger welcome + verify email
+        send_verification_email(user)
 
-        flash("Welcome to the inner circle! Your membership is now active.", "success")
-        return redirect(url_for("feed"))
+        ghl_upsert_contact(email, name, tags=["Paid Member", "Sovereign Society"])
+        flash("Welcome to the Society. Check your email to confirm.", "success")
+        return redirect(url_for("onboarding"))
 
-    # GET: show account creation form
     return render_template("signup.html", email=email, session_id=session_id, stripe_mode=True)
 
 
+# Referral-based lifetime: a member qualifies when 3 of their referrals
+# each complete 6 successful payments.
+PAYMENTS_PER_REFERRAL_QUALIFICATION = 6
+QUALIFIED_REFERRALS_FOR_LIFETIME = 3
+
+
 @app.route("/webhook/stripe", methods=["POST"])
+@csrf.exempt
 def stripe_webhook():
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get("Stripe-Signature")
@@ -940,43 +1364,145 @@ def stripe_webhook():
     except Exception:
         return jsonify({"error": "Invalid signature"}), 400
 
+    # Idempotency: skip events we've already processed.
+    event_id = event.get("id")
+    if event_id and StripeEvent.query.filter_by(stripe_event_id=event_id).first():
+        return jsonify({"status": "duplicate"})
+
     event_type = event["type"]
     data = event["data"]["object"]
 
-    if event_type == "customer.subscription.updated":
-        sub_id = data["id"]
-        user = User.query.filter_by(stripe_subscription_id=sub_id).first()
-        if user:
-            status = data["status"]
-            user.subscription_status = "active" if status == "active" else status
-            if data.get("current_period_end"):
-                user.subscription_current_period_end = datetime.utcfromtimestamp(data["current_period_end"])
-            db.session.commit()
-
-    elif event_type == "customer.subscription.deleted":
-        sub_id = data["id"]
-        user = User.query.filter_by(stripe_subscription_id=sub_id).first()
-        if user:
-            user.subscription_status = "canceled"
-            db.session.commit()
-            # GHL: tag Churned
-            ghl_upsert_contact(user.email, user.name, tags=["Churned", "ABMC"])
-
-    elif event_type == "invoice.payment_succeeded":
-        customer_id = data.get("customer")
-        user = User.query.filter_by(stripe_customer_id=customer_id).first()
-        if user:
-            user.subscription_status = "active"
-            db.session.commit()
-
-    elif event_type == "invoice.payment_failed":
-        customer_id = data.get("customer")
-        user = User.query.filter_by(stripe_customer_id=customer_id).first()
-        if user:
-            user.subscription_status = "past_due"
+    try:
+        if event_type == "checkout.session.completed":
+            _handle_checkout_completed(data)
+        elif event_type == "customer.subscription.updated":
+            _handle_subscription_updated(data)
+        elif event_type == "customer.subscription.deleted":
+            _handle_subscription_deleted(data)
+        elif event_type == "invoice.payment_succeeded":
+            _handle_payment_succeeded(data)
+        elif event_type == "invoice.payment_failed":
+            _handle_payment_failed(data)
+    finally:
+        if event_id:
+            db.session.add(StripeEvent(stripe_event_id=event_id, event_type=event_type))
             db.session.commit()
 
     return jsonify({"status": "ok"})
+
+
+def _handle_checkout_completed(data):
+    """Backfill user's stripe IDs if they reached this state via webhook before /success."""
+    customer_id = data.get("customer")
+    email = (data.get("customer_details") or {}).get("email") or (data.get("metadata") or {}).get("email")
+    if not customer_id or not email:
+        return
+    user = User.query.filter_by(email=email.strip().lower()).first()
+    if user and not user.stripe_customer_id:
+        user.stripe_customer_id = customer_id
+        user.stripe_subscription_id = data.get("subscription")
+        user.subscription_status = "active"
+        db.session.commit()
+
+
+def _handle_subscription_updated(data):
+    user = User.query.filter_by(stripe_subscription_id=data["id"]).first()
+    if not user:
+        return
+    if user.lifetime_access:
+        # Don't overwrite lifetime status with downstream sub events.
+        return
+    user.subscription_status = "active" if data["status"] == "active" else data["status"]
+    if data.get("current_period_end"):
+        user.subscription_current_period_end = datetime.utcfromtimestamp(data["current_period_end"])
+    db.session.commit()
+
+
+def _handle_subscription_deleted(data):
+    user = User.query.filter_by(stripe_subscription_id=data["id"]).first()
+    if not user:
+        return
+    if user.lifetime_access:
+        # Lifetime member's sub was canceled (by us, after 3 payments) — don't downgrade.
+        return
+    user.subscription_status = "canceled"
+    db.session.commit()
+    ghl_upsert_contact(user.email, user.name, tags=["Churned", "ABMC"])
+
+
+def _handle_payment_succeeded(data):
+    """Process a successful $99 payment.
+
+    Counts toward this user's payments_made_count. When their count hits 6,
+    their referrer (if any) gets +1 to qualified_referrals_count. When the
+    referrer's count hits 3, the referrer gets lifetime access.
+    """
+    customer_id = data.get("customer")
+    user = User.query.filter_by(stripe_customer_id=customer_id).first()
+    if not user:
+        return
+    if user.lifetime_access:
+        return  # Lifetime members shouldn't be billed; safety net.
+
+    user.payments_made_count = (user.payments_made_count or 0) + 1
+    user.subscription_status = "active"
+
+    # Did this payment cause the user to *qualify* for their referrer?
+    just_qualified_for_referrer = (
+        user.payments_made_count == PAYMENTS_PER_REFERRAL_QUALIFICATION
+        and user.referred_by is not None
+    )
+
+    referrer_unlocked_lifetime = False
+    referrer = None
+    if just_qualified_for_referrer:
+        referrer = User.query.get(user.referred_by)
+        if referrer and not referrer.lifetime_access:
+            referrer.qualified_referrals_count = (referrer.qualified_referrals_count or 0) + 1
+            if referrer.qualified_referrals_count >= QUALIFIED_REFERRALS_FOR_LIFETIME:
+                referrer.lifetime_access = True
+                referrer.lifetime_qualified_at = datetime.utcnow()
+                referrer.subscription_status = "active"
+                referrer_unlocked_lifetime = True
+                if referrer.stripe_subscription_id:
+                    try:
+                        stripe.Subscription.cancel(referrer.stripe_subscription_id)
+                    except Exception as e:
+                        print(f"[STRIPE] Failed to cancel referrer sub {referrer.stripe_subscription_id}: {e}")
+
+    db.session.commit()
+
+    # Receipt to the paying user
+    amount = data.get("amount_paid", 0) or 0
+    send_payment_succeeded(user, amount, user.payments_made_count, lifetime_unlocked=False)
+
+    # Notify referrer of progress / qualification
+    if referrer:
+        try:
+            from email_send import send_referral_progress
+            send_referral_progress(
+                referrer=referrer,
+                referee=user,
+                qualified_count=referrer.qualified_referrals_count,
+                threshold=QUALIFIED_REFERRALS_FOR_LIFETIME,
+            )
+        except Exception as e:
+            print(f"[EMAIL] referral progress failed: {e}")
+
+    if referrer_unlocked_lifetime:
+        send_lifetime_unlocked(referrer)
+        ghl_upsert_contact(referrer.email, referrer.name, tags=["Lifetime", "ABMC"])
+
+
+def _handle_payment_failed(data):
+    customer_id = data.get("customer")
+    user = User.query.filter_by(stripe_customer_id=customer_id).first()
+    if not user or user.lifetime_access:
+        return
+    user.subscription_status = "past_due"
+    db.session.commit()
+    update_url = request.host_url.rstrip("/") + url_for("billing_portal")
+    send_payment_failed(user, update_url)
 
 
 @app.route("/billing-portal", methods=["POST"])
@@ -1001,25 +1527,52 @@ def billing_portal():
 @app.route("/admin")
 @admin_required
 def admin_panel():
-    total_members = User.query.count()
-    total_subscribers = User.query.filter_by(subscription_status="active").count()
-    total_posts = Post.query.count()
-    total_events = Event.query.count()
-    total_spaces = Space.query.count()
-    total_courses = Course.query.count()
-    members = User.query.order_by(User.created_at.desc()).all()
-    return render_template("admin.html",
-                           total_members=total_members,
-                           total_subscribers=total_subscribers,
-                           total_posts=total_posts,
-                           total_events=total_events,
-                           total_spaces=total_spaces,
-                           total_courses=total_courses,
-                           members=members)
+    q = request.args.get("q", "").strip()
+    members_q = User.query
+    if q:
+        like = f"%{q}%"
+        members_q = members_q.filter((User.email.ilike(like)) | (User.name.ilike(like)))
+    members = members_q.order_by(User.created_at.desc()).limit(200).all()
+
+    stats = {
+        "total_members": User.query.count(),
+        "active_subs": User.query.filter_by(subscription_status="active", lifetime_access=False).count(),
+        "lifetime": User.query.filter_by(lifetime_access=True).count(),
+        "past_due": User.query.filter_by(subscription_status="past_due").count(),
+        "canceled": User.query.filter_by(subscription_status="canceled").count(),
+        "mrr_cents": User.query.filter_by(subscription_status="active", lifetime_access=False).count() * 9900,
+        "total_posts": Post.query.count(),
+        "total_spaces": Space.query.count(),
+    }
+    return render_template("admin.html", members=members, stats=stats, q=q)
+
+
+@app.route("/admin/member/<int:user_id>")
+@admin_required
+def admin_member_detail(user_id):
+    user = User.query.get_or_404(user_id)
+    stripe_events = []
+    if user.stripe_customer_id and "placeholder" not in (STRIPE_SECRET_KEY or "").lower():
+        try:
+            invoices = stripe.Invoice.list(customer=user.stripe_customer_id, limit=20)
+            stripe_events = [
+                {
+                    "id": inv.id,
+                    "amount": inv.amount_paid / 100.0,
+                    "status": inv.status,
+                    "created": datetime.utcfromtimestamp(inv.created),
+                    "hosted_url": inv.hosted_invoice_url,
+                }
+                for inv in invoices.auto_paging_iter()
+            ]
+        except Exception as e:
+            print(f"[ADMIN] Stripe lookup failed: {e}")
+    return render_template("admin_member.html", user=user, stripe_events=stripe_events)
 
 
 @app.route("/admin/toggle-admin/<int:user_id>", methods=["POST"])
 @admin_required
+@require_csrf
 def toggle_admin(user_id):
     user = User.query.get_or_404(user_id)
     if user.id == current_user.id:
@@ -1033,15 +1586,75 @@ def toggle_admin(user_id):
 
 @app.route("/admin/toggle-subscription/<int:user_id>", methods=["POST"])
 @admin_required
+@require_csrf
 def toggle_subscription(user_id):
     user = User.query.get_or_404(user_id)
-    if user.subscription_status == "active":
-        user.subscription_status = "inactive"
-    else:
-        user.subscription_status = "active"
+    user.subscription_status = "inactive" if user.subscription_status == "active" else "active"
     db.session.commit()
-    flash(f"Subscription {'activated' if user.subscription_status == 'active' else 'deactivated'} for {user.name}.", "success")
-    return redirect(url_for("admin_panel"))
+    flash(f"Subscription set to {user.subscription_status} for {user.name}.", "success")
+    return redirect(request.referrer or url_for("admin_panel"))
+
+
+@app.route("/admin/grant-lifetime/<int:user_id>", methods=["POST"])
+@admin_required
+@require_csrf
+def admin_grant_lifetime(user_id):
+    user = User.query.get_or_404(user_id)
+    user.lifetime_access = True
+    user.subscription_status = "active"
+    db.session.commit()
+    # If they have an active Stripe sub, cancel it (no more billing).
+    if user.stripe_subscription_id and "placeholder" not in (STRIPE_SECRET_KEY or "").lower():
+        try:
+            stripe.Subscription.cancel(user.stripe_subscription_id)
+        except Exception as e:
+            flash(f"Lifetime granted, but Stripe cancel failed: {e}", "warning")
+    flash(f"Lifetime access granted to {user.name}.", "success")
+    return redirect(url_for("admin_member_detail", user_id=user.id))
+
+
+@app.route("/admin/revoke-lifetime/<int:user_id>", methods=["POST"])
+@admin_required
+@require_csrf
+def admin_revoke_lifetime(user_id):
+    user = User.query.get_or_404(user_id)
+    user.lifetime_access = False
+    db.session.commit()
+    flash(f"Lifetime access revoked for {user.name}.", "success")
+    return redirect(url_for("admin_member_detail", user_id=user.id))
+
+
+@app.route("/admin/refund-last/<int:user_id>", methods=["POST"])
+@admin_required
+@require_csrf
+def admin_refund_last(user_id):
+    user = User.query.get_or_404(user_id)
+    if not user.stripe_customer_id:
+        flash("No Stripe customer.", "error")
+        return redirect(url_for("admin_member_detail", user_id=user.id))
+    try:
+        charges = stripe.Charge.list(customer=user.stripe_customer_id, limit=1)
+        if not charges.data:
+            flash("No charges to refund.", "error")
+            return redirect(url_for("admin_member_detail", user_id=user.id))
+        last = charges.data[0]
+        stripe.Refund.create(charge=last.id)
+        flash(f"Refunded ${last.amount/100:.2f} to {user.name}.", "success")
+    except Exception as e:
+        flash(f"Refund failed: {e}", "error")
+    return redirect(url_for("admin_member_detail", user_id=user.id))
+
+
+@app.route("/admin/comp-month/<int:user_id>", methods=["POST"])
+@admin_required
+@require_csrf
+def admin_comp_month(user_id):
+    user = User.query.get_or_404(user_id)
+    user.subscription_status = "active"
+    user.subscription_current_period_end = datetime.utcnow() + timedelta(days=30)
+    db.session.commit()
+    flash(f"Comped 30 days for {user.name}.", "success")
+    return redirect(url_for("admin_member_detail", user_id=user.id))
 
 
 # ===== THE VAULT (lessons alias) =====

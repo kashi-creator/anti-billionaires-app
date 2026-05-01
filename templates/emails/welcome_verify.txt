@@ -1,0 +1,8 @@
+Welcome, {{ user.name }}.
+
+Your membership is active. One last step: confirm your email so we know it's really you.
+
+Confirm here (link valid 7 days):
+{{ verify_url }}
+
+— Sovereign Society

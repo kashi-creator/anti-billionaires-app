@@ -250,18 +250,20 @@ def _auto_check_item(user_id, title_substring):
 # =====================================================================
 
 def seed_checklist():
-    """Create default checklist items if none exist."""
-    if ChecklistItem.query.count() > 0:
-        return
-    defaults = [
-        ("Complete your profile", "Add a bio and profile photo to let the brotherhood know who you are.", "/profile/edit"),
-        ("Make your first post", "Share something with the club in the feed.", "/feed"),
-        ("Join a Space", "Find a Space that interests you and join the conversation.", "/spaces"),
-        ("Follow 3 members", "Connect with 3 other members of the brotherhood.", "/members"),
-        ("RSVP to an event", "Check out upcoming events and mark yourself as Going.", "/events"),
-        ("Complete a lesson", "Start learning by completing your first lesson.", "/lessons"),
+    """Create/update default checklist items."""
+    desired = [
+        ("Read the Manifesto", "Read the founding manifesto of Sovereign Society.", "/feed"),
+        ("Introduce Yourself", "Post in the feed - who are you, what are you building, and what are you done tolerating?", "/feed"),
+        ("Join 2 Spaces", "Find Spaces that interest you and join the conversation.", "/spaces"),
+        ("Follow 5 Brothers", "Connect with 5 other members of the brotherhood.", "/members"),
+        ("RSVP to Fire to Fire", "Check out the next Fire to Fire gathering and mark yourself as Going.", "/events"),
     ]
-    for i, (title, desc, link) in enumerate(defaults):
-        item = ChecklistItem(title=title, description=desc, link=link, order_index=i)
-        db.session.add(item)
-    db.session.commit()
+    changed = False
+    for i, (title, desc, link) in enumerate(desired):
+        existing = ChecklistItem.query.filter_by(title=title).first()
+        if not existing:
+            item = ChecklistItem(title=title, description=desc, link=link, order_index=i)
+            db.session.add(item)
+            changed = True
+    if changed:
+        db.session.commit()

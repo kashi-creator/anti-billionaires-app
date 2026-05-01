@@ -1,0 +1,7 @@
+Hi {{ user.name }},
+
+Payment received: {{ amount }}.
+
+Your path to lifetime access: refer 3 active members who each stay paid for 6 months — then you stop paying, forever.
+
+— Sovereign Society

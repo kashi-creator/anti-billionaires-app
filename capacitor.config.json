@@ -1,0 +1,38 @@
+{
+  "appId": "com.onepercentmensclub.app",
+  "appName": "Sovereign",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://onepercentmensclub.up.railway.app",
+    "cleartext": false,
+    "androidScheme": "https",
+    "iosScheme": "https"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0A0A0A",
+      "showSpinner": false,
+      "androidSplashResourceName": "splash"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0A0A0A"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "style": "DARK"
+    }
+  },
+  "ios": {
+    "contentInset": "always",
+    "scheme": "OnePercentMC"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

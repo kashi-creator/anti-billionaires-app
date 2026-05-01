@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ user.name }} — Admin{% endblock %}
+
+{% block content %}
+<div style="max-width:880px;margin:32px auto;padding:0 24px;">
+  <a href="{{ url_for('admin_panel') }}" style="color:#888;text-decoration:none;font-size:13px;">← Back to admin</a>
+  <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;font-size:36px;margin:24px 0 8px 0;">{{ user.name }}</h1>
+  <div style="color:#888;margin-bottom:32px;">{{ user.email }}</div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px;">
+    <div style="background:#111;border:1px solid #1f1f1f;padding:16px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;">Subscription</div>
+      <div style="color:{% if user.lifetime_access %}#D4AF37{% elif user.subscription_status == 'active' %}#D4AF37{% else %}#888{% endif %};font-size:16px;margin-top:4px;font-weight:bold;">
+        {% if user.lifetime_access %}Lifetime{% else %}{{ user.subscription_status }}{% endif %}
+      </div>
+    </div>
+    <div style="background:#111;border:1px solid #1f1f1f;padding:16px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;">Payments Made</div>
+      <div style="color:#fff;font-size:16px;margin-top:4px;font-weight:bold;">{{ user.payments_made_count }} / 3</div>
+    </div>
+    <div style="background:#111;border:1px solid #1f1f1f;padding:16px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;">Email Verified</div>
+      <div style="color:{% if user.email_verified %}#D4AF37{% else %}#ff9966{% endif %};font-size:16px;margin-top:4px;font-weight:bold;">{{ 'Yes' if user.email_verified else 'No' }}</div>
+    </div>
+    <div style="background:#111;border:1px solid #1f1f1f;padding:16px;border-radius:6px;">
+      <div style="color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;">Points</div>
+      <div style="color:#fff;font-size:16px;margin-top:4px;font-weight:bold;">{{ user.points or 0 }}</div>
+    </div>
+  </div>
+
+  <h2 style="font-family:'Cormorant Garamond',Georgia,serif;color:#fff;margin:32px 0 16px 0;">Actions</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:32px;">
+    {% if not user.lifetime_access %}
+    <form method="POST" action="{{ url_for('admin_grant_lifetime', user_id=user.id) }}" onsubmit="return confirm('Grant lifetime access? This will cancel their Stripe subscription.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-gold">Grant Lifetime</button>
+    </form>
+    {% else %}
+    <form method="POST" action="{{ url_for('admin_revoke_lifetime', user_id=user.id) }}" onsubmit="return confirm('Revoke lifetime access?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline">Revoke Lifetime</button>
+    </form>
+    {% endif %}
+    <form method="POST" action="{{ url_for('toggle_subscription', user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline">Toggle Subscription</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin_comp_month', user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline">Comp 30 Days</button>
+    </form>
+    <form method="POST" action="{{ url_for('admin_refund_last', user_id=user.id) }}" onsubmit="return confirm('Refund the most recent charge?')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline" style="border-color:#ff9966;color:#ff9966;">Refund Last Payment</button>
+    </form>
+    {% if user.id != current_user.id %}
+    <form method="POST" action="{{ url_for('toggle_admin', user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-outline">{% if user.is_admin %}Revoke Admin{% else %}Make Admin{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <h2 style="font-family:'Cormorant Garamond',Georgia,serif;color:#fff;margin:32px 0 16px 0;">Stripe History</h2>
+  {% if stripe_events %}
+    <div style="background:#111;border:1px solid #1f1f1f;border-radius:6px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead style="background:#0a0a0a;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;">
+          <tr><th style="text-align:left;padding:10px 14px;">Date</th><th style="text-align:left;padding:10px 14px;">Amount</th><th style="text-align:left;padding:10px 14px;">Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for ev in stripe_events %}
+          <tr style="border-top:1px solid #1f1f1f;">
+            <td style="padding:10px 14px;color:#ccc;">{{ ev.created.strftime('%b %d, %Y') }}</td>
+            <td style="padding:10px 14px;color:#D4AF37;">${{ '%.2f' % ev.amount }}</td>
+            <td style="padding:10px 14px;color:#ccc;">{{ ev.status }}</td>
+            <td style="padding:10px 14px;text-align:right;"><a href="{{ ev.hosted_url }}" target="_blank" style="color:#D4AF37;font-size:12px;">View →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p style="color:#666;">No Stripe history (or Stripe not configured yet).</p>
+  {% endif %}
+</div>
+{% endblock %}

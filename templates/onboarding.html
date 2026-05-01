@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Welcome — step {{ step }}{% endblock %}
+
+{% block content %}
+<style>
+  .ob-wrap { max-width: 640px; margin: 60px auto; padding: 0 24px; }
+  .ob-progress { display:flex; gap:8px; margin-bottom:48px; }
+  .ob-progress-step { flex:1; height:3px; background:#1f1f1f; border-radius:2px; }
+  .ob-progress-step.done { background: linear-gradient(90deg, #D4AF37, #B8941F); }
+  .ob-progress-step.current { background: #D4AF37; }
+  .ob-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px; padding: 56px 48px;
+  }
+  .ob-eyebrow { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:#888; margin-bottom:12px; }
+  .ob-h1 {
+    font-family:'Cormorant Garamond', Georgia, serif; font-size:40px; color:#fff;
+    margin: 0 0 12px 0; letter-spacing:-0.5px;
+  }
+  .ob-sub { color:#888; margin-bottom:40px; line-height:1.6; }
+  .ob-input, .ob-textarea {
+    width:100%; padding:14px 16px; background:#0a0a0a; border:1px solid #2a2a2a;
+    color:#fff; font-size:15px; border-radius:6px; box-sizing:border-box;
+    font-family: inherit;
+  }
+  .ob-input:focus, .ob-textarea:focus { outline:none; border-color:#D4AF37; }
+  .ob-textarea { min-height: 140px; resize:vertical; }
+  .ob-row { display:flex; gap:16px; }
+  .ob-row .ob-input { flex:1; }
+  .ob-label { display:block; font-size:13px; color:#aaa; margin: 16px 0 8px 0; letter-spacing:1px; text-transform:uppercase; }
+  .ob-actions { display:flex; gap:16px; margin-top:32px; align-items:center; }
+  .ob-btn {
+    padding: 14px 32px; background: linear-gradient(135deg, #D4AF37, #B8941F);
+    color:#0A0A0A; font-weight:bold; letter-spacing:2px; text-transform:uppercase; font-size:13px;
+    border:none; border-radius:4px; cursor:pointer; flex:1;
+  }
+  .ob-btn-skip {
+    background:transparent; color:#888; border:1px solid #2a2a2a;
+    padding: 14px 24px; font-size:13px; letter-spacing:1px; text-transform:uppercase;
+    border-radius:4px; text-decoration:none; cursor:pointer;
+  }
+  .ob-photo-preview {
+    width:120px; height:120px; border-radius:50%; background:#0a0a0a;
+    border: 2px solid #2a2a2a; display:flex; align-items:center; justify-content:center;
+    color:#444; font-size:48px; margin: 0 auto 24px auto; overflow:hidden;
+  }
+  .ob-photo-preview img { width:100%; height:100%; object-fit:cover; }
+  .ob-file { display:none; }
+  .ob-file-label {
+    display:block; padding:14px; background:#0a0a0a; border:1px dashed #2a2a2a;
+    border-radius:6px; text-align:center; color:#888; cursor:pointer;
+  }
+  .ob-file-label:hover { border-color:#D4AF37; color:#D4AF37; }
+  .ob-spaces { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
+  .ob-space {
+    padding: 16px; background:#0a0a0a; border:1px solid #2a2a2a;
+    border-radius:6px; cursor:pointer; transition: all 0.2s;
+  }
+  .ob-space input { display:none; }
+  .ob-space.selected { border-color:#D4AF37; background:rgba(212,175,55,0.06); }
+  .ob-space-name { color:#fff; font-weight:bold; margin-bottom:4px; font-size:15px; }
+  .ob-space-desc { color:#888; font-size:13px; line-height:1.4; }
+</style>
+
+<div class="ob-wrap">
+  <div class="ob-progress">
+    {% for i in range(1, total_steps + 1) %}
+    <div class="ob-progress-step {% if i < step %}done{% elif i == step %}current{% endif %}"></div>
+    {% endfor %}
+  </div>
+
+  <div class="ob-card">
+    <div class="ob-eyebrow">Step {{ step }} of {{ total_steps }}</div>
+
+    <form method="POST" enctype="multipart/form-data" action="{{ url_for('onboarding_submit') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="step" value="{{ step }}">
+
+      {% if step == 1 %}
+        <h1 class="ob-h1">Show your face.</h1>
+        <p class="ob-sub">Members put names to faces. Real photo only — no logos, no stock.</p>
+        <div class="ob-photo-preview" id="photoPreview">
+          {% if current_user.profile_photo %}
+            <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+          {% else %}
+            <span>+</span>
+          {% endif %}
+        </div>
+        <label class="ob-file-label" for="profile_photo">Choose a photo</label>
+        <input class="ob-file" type="file" id="profile_photo" name="profile_photo" accept="image/*">
+
+      {% elif step == 2 %}
+        <h1 class="ob-h1">Who are you?</h1>
+        <p class="ob-sub">One paragraph. What you do, what you're building, what you can offer.</p>
+        <textarea class="ob-textarea" name="bio" placeholder="I run a..." maxlength="2000">{{ current_user.bio or '' }}</textarea>
+
+      {% elif step == 3 %}
+        <h1 class="ob-h1">Where in the world?</h1>
+        <p class="ob-sub">Your city helps members in your area find you. Specific coordinates are optional.</p>
+        <label class="ob-label">City</label>
+        <input class="ob-input" type="text" name="city" placeholder="e.g. Austin" value="{{ current_user.city or '' }}">
+        <label class="ob-label">Country</label>
+        <input class="ob-input" type="text" name="country" placeholder="e.g. USA" value="{{ current_user.country or '' }}">
+        <input type="hidden" id="lat" name="lat" value="{{ current_user.lat or '' }}">
+        <input type="hidden" id="lng" name="lng" value="{{ current_user.lng or '' }}">
+
+      {% elif step == 4 %}
+        <h1 class="ob-h1">Pick your spaces.</h1>
+        <p class="ob-sub">Join at least 3. You can leave or join others anytime.</p>
+        <div class="ob-spaces">
+          {% for s in spaces %}
+          <label class="ob-space {% if s.id in joined_space_ids %}selected{% endif %}">
+            <input type="checkbox" name="space_ids" value="{{ s.id }}"
+                   {% if s.id in joined_space_ids %}checked{% endif %}
+                   onchange="this.parentElement.classList.toggle('selected', this.checked)">
+            <div class="ob-space-name">{{ s.name }}</div>
+            <div class="ob-space-desc">{{ (s.description or '')[:90] }}{% if s.description and s.description|length > 90 %}…{% endif %}</div>
+          </label>
+          {% endfor %}
+        </div>
+
+      {% elif step == 5 %}
+        <h1 class="ob-h1">Your first post.</h1>
+        <p class="ob-sub">Introduce yourself to the Society. What you're working on. What you need. What you can offer.</p>
+        <textarea class="ob-textarea" name="first_post" placeholder="Hey — I'm {{ current_user.name.split(' ')[0] }}. I..." maxlength="5000"></textarea>
+
+      {% endif %}
+
+      <div class="ob-actions">
+        {% if step < total_steps %}
+          <button type="submit" name="skip" value="1" class="ob-btn-skip">Skip</button>
+        {% endif %}
+        <button type="submit" class="ob-btn">
+          {% if step < total_steps %}Continue{% else %}Enter the Society{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if step == 1 %}
+<script>
+document.getElementById('profile_photo').addEventListener('change', function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function(ev) {
+    document.getElementById('photoPreview').innerHTML = '<img src="' + ev.target.result + '">';
+  };
+  r.readAsDataURL(f);
+});
+</script>
+{% endif %}
+
+{% if step == 3 %}
+<script>
+// Best-effort geolocation
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('lng').value = pos.coords.longitude.toFixed(6);
+  }, function() {}, { timeout: 5000 });
+}
+</script>
+{% endif %}
+{% endblock %}

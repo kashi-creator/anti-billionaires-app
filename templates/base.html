@@ -2,13 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}1%MC{% endblock %} | The 1% Men's Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0A0A0A">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sovereign">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <title>{% block title %}Sovereign{% endblock %} | Sovereign Society</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/phase3.css') }}">
+    <style>
+      /* Native-app overrides: hide checkout/upgrade UI per Apple "reader" rule. */
+      html.native-app .native-hide,
+      html.native-app a[href*="/pricing"],
+      html.native-app a[href*="/checkout"] { display: none !important; }
+    </style>
+    {% if is_native_app %}<script src="https://cdn.jsdelivr.net/npm/@capacitor/core@6/dist/capacitor.min.js"></script>{% endif %}
 </head>
 <body>
     <!-- Constellation background -->
@@ -84,9 +96,9 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{{ url_for('feed') }}" class="nav-logo">
-                <span class="logo-text">1%MC</span>
+                <span class="logo-text">SOVEREIGN</span>
                 <span class="logo-divider"></span>
-                <span class="logo-tagline">The 1% Men's Club</span>
+                <span class="logo-tagline">Sovereign Society</span>
             </a>
             <div class="nav-links">
                 <a href="{{ url_for('feed') }}" class="nav-link {% if request.endpoint == 'feed' %}active{% endif %}">
@@ -283,5 +295,6 @@
         }, 4000);
     </script>
     {% block scripts %}{% endblock %}
+    {% if is_native_app %}<script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>{% endif %}
 </body>
 </html>

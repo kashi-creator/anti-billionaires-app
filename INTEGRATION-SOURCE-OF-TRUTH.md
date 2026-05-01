@@ -1,4 +1,4 @@
-# The 1% Men's Club (anti-billionaires-app) — Integration Source of Truth
+# Sovereign Society (anti-billionaires-app) — Integration Source of Truth
 
 > **Master reference for any Claude Code session that touches this project.**
 > Every session reads this file first. Every session updates the relevant section before exiting. Do not skip — the next session depends on it.
@@ -7,7 +7,7 @@
 
 ## 1. Project Identity
 
-- **Brand name:** The 1% Men's Club (formerly "Anti Billionaires")
+- **Brand name:** Sovereign Society (formerly "The 1% Men's Club" / "Anti Billionaires")
 - **Repo:** github.com/kashi-creator/anti-billionaires-app
 - **Local repo (laptop):** `~/Desktop/anti-billionaires-app`
 - **Local repo (Mac mini):** [TBD — clone path]
