@@ -198,8 +198,12 @@ img { max-width: 100%; height: auto; }
     padding: 100px 1.5rem 3rem;
 }
 
-/* No fixed nav for anonymous users — kill the dead top-padding */
-body.no-nav .main-content { padding-top: 2rem; }
+/* No fixed nav for anonymous users — kill the dead top-padding.
+   Applies at ALL viewport widths since there's no nav to clear at any size. */
+body.no-nav .main-content { padding-top: 0.5rem !important; padding-left: 1rem; padding-right: 1rem; }
+body.no-nav .pricing-container { padding-top: 0 !important; }
+body.no-nav .pricing-header { margin-bottom: 1rem !important; }
+body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
 
 /* ============ AUTH PAGES ============ */
 .auth-page {
