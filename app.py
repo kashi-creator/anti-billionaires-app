@@ -265,12 +265,17 @@ def load_user(user_id):
 
 # Schema is now managed by Flask-Migrate (alembic).
 # In dev: db.create_all() bootstraps a fresh sqlite DB.
-# In prod: run `flask db upgrade` on deploy (Railway release command).
+# In prod: `flask db upgrade` runs at container start before gunicorn (railway.json startCommand).
+# Seed calls are wrapped so module import doesn't fail if the DB isn't reachable yet
+# (e.g. during build, or while migrations are still running).
 with app.app_context():
-    if _db_url.startswith("sqlite:"):
-        db.create_all()
-    seed_checklist()
-    seed_badges()
+    try:
+        if _db_url.startswith("sqlite:"):
+            db.create_all()
+        seed_checklist()
+        seed_badges()
+    except Exception as _seed_err:
+        print(f"[STARTUP] Seed deferred: {_seed_err}", flush=True)
 
 
 def _seed_content():
