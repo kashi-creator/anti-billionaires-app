@@ -11,6 +11,70 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/phase3.css') }}">
 </head>
 <body>
+    <!-- Constellation background -->
+    <canvas id="constellation"></canvas>
+    <script>
+    (function() {
+        const c = document.getElementById('constellation');
+        const ctx = c.getContext('2d');
+        let w, h, particles = [];
+        const COUNT = 60;
+        const MAX_DIST = 140;
+
+        function resize() {
+            w = c.width = window.innerWidth;
+            h = c.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        for (let i = 0; i < COUNT; i++) {
+            particles.push({
+                x: Math.random() * w,
+                y: Math.random() * h,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: (Math.random() - 0.5) * 0.3,
+                r: Math.random() * 1.5 + 0.5
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, w, h);
+            for (let i = 0; i < COUNT; i++) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = w;
+                if (p.x > w) p.x = 0;
+                if (p.y < 0) p.y = h;
+                if (p.y > h) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(201,168,76,0.5)';
+                ctx.fill();
+
+                for (let j = i + 1; j < COUNT; j++) {
+                    const q = particles[j];
+                    const dx = p.x - q.x;
+                    const dy = p.y - q.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < MAX_DIST) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(q.x, q.y);
+                        ctx.strokeStyle = 'rgba(201,168,76,' + (0.12 * (1 - dist / MAX_DIST)) + ')';
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(draw);
+        }
+        draw();
+    })();
+    </script>
+
     <!-- Floating gold orbs for premium background atmosphere -->
     <div style="position:fixed;width:500px;height:500px;background:radial-gradient(circle,rgba(201,168,76,0.06) 0%,transparent 70%);border-radius:50%;filter:blur(60px);pointer-events:none;top:20%;left:-10%;animation:float 10s ease-in-out infinite;z-index:0;"></div>
     <div style="position:fixed;width:400px;height:400px;background:radial-gradient(circle,rgba(201,168,76,0.04) 0%,transparent 70%);border-radius:50%;filter:blur(60px);pointer-events:none;bottom:10%;right:-5%;animation:float 12s ease-in-out infinite reverse;z-index:0;"></div>
