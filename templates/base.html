@@ -22,7 +22,7 @@
     </style>
     {% if is_native_app %}<script src="https://cdn.jsdelivr.net/npm/@capacitor/core@6/dist/capacitor.min.js"></script>{% endif %}
 </head>
-<body>
+<body class="{% if not current_user.is_authenticated %}no-nav{% endif %}">
     <!-- Constellation background -->
     <canvas id="constellation"></canvas>
     <script>
