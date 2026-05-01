@@ -17,14 +17,14 @@ depends_on = None
 
 def upgrade():
     with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('0')))
+        batch_op.add_column(sa.Column('email_verified', sa.Boolean(), nullable=False, server_default=sa.text('false')))
         batch_op.add_column(sa.Column('email_verify_token', sa.String(length=64), nullable=True))
         batch_op.add_column(sa.Column('email_verify_expires', sa.DateTime(), nullable=True))
         batch_op.add_column(sa.Column('password_reset_token', sa.String(length=64), nullable=True))
         batch_op.add_column(sa.Column('password_reset_expires', sa.DateTime(), nullable=True))
         batch_op.add_column(sa.Column('payments_made_count', sa.Integer(), nullable=False, server_default=sa.text('0')))
-        batch_op.add_column(sa.Column('lifetime_access', sa.Boolean(), nullable=False, server_default=sa.text('0')))
-        batch_op.add_column(sa.Column('onboarding_complete', sa.Boolean(), nullable=False, server_default=sa.text('0')))
+        batch_op.add_column(sa.Column('lifetime_access', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+        batch_op.add_column(sa.Column('onboarding_complete', sa.Boolean(), nullable=False, server_default=sa.text('false')))
         batch_op.create_index('ix_user_email_verify_token', ['email_verify_token'], unique=False)
         batch_op.create_index('ix_user_password_reset_token', ['password_reset_token'], unique=False)
         batch_op.create_unique_constraint('uq_user_referral_code', ['referral_code'])
