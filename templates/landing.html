@@ -9,6 +9,10 @@
 <meta property="og:title" content="Sovereign Society">
 <meta property="og:description" content="A private society for the men who refused to be average.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="{{ url_for('static', filename='img/sovereign-logo.png', _external=True) }}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -89,6 +93,16 @@
     transform: rotate(45deg);
     box-shadow: 0 0 12px var(--gold);
   }
+  .hud .brand-mark-img {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    filter: drop-shadow(0 0 8px rgba(212,175,55,0.35));
+    transition: filter 0.3s, transform 0.3s;
+  }
+  .hud .brand:hover .brand-mark-img {
+    filter: drop-shadow(0 0 14px rgba(212,175,55,0.6));
+    transform: scale(1.05);
+  }
   .hud .brand-text {
     color: var(--ink);
     font-weight: 500;
@@ -154,6 +168,34 @@
     text-align: left;
     justify-content: flex-start;
     padding-top: 12vh;
+  }
+  .hero-logo {
+    width: clamp(120px, 16vw, 180px);
+    height: auto;
+    display: block;
+    margin: 0 0 40px;
+    border-radius: 16px;
+    filter: drop-shadow(0 0 24px rgba(212,175,55,0.25)) drop-shadow(0 0 48px rgba(212,175,55,0.12));
+    animation: logoFloat 8s ease-in-out infinite;
+  }
+  @keyframes logoFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .cta-seal {
+    width: clamp(90px, 10vw, 120px);
+    height: auto;
+    display: block;
+    margin: 0 auto 32px;
+    border-radius: 14px;
+    filter: drop-shadow(0 0 20px rgba(212,175,55,0.3));
+    opacity: 0.92;
+  }
+  .footer-brand { display: flex; align-items: center; gap: 12px; }
+  .footer-logo {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    opacity: 0.7;
   }
   .hero-eyebrow {
     font-family: var(--mono);
@@ -476,6 +518,8 @@
   @media (max-width: 768px) {
     .chapter { padding: 80px 24px 80px; }
     .hero { padding-top: 80px; padding-bottom: 40px; }
+    .hero-logo { width: 96px; margin-bottom: 24px; }
+    .cta-seal { width: 84px; margin-bottom: 24px; }
     .pillar { padding: 36px 24px; }
     .tier { padding: 32px 24px; }
     .quote { padding: 32px 24px; }
@@ -498,7 +542,7 @@
 
 <nav class="hud" id="hud">
   <a href="#hero" class="brand">
-    <div class="brand-mark"></div>
+    <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="brand-mark-img" aria-hidden="true">
     <span class="brand-text">SOVEREIGN</span>
   </a>
   <div class="hud-chapters">
@@ -513,10 +557,11 @@
 
 <!-- 00 / HERO -->
 <section class="chapter hero" id="hero">
-  <div class="hero-eyebrow reveal">Sovereign Society — by application only</div>
-  <h1 class="reveal delay-1">For the men who<br><em>refused</em> to be<br>average.</h1>
-  <p class="hero-sub reveal delay-2">A private society of operators, builders, and protectors. Deal flow. Accountability. Brotherhood. The system was not built for sovereign men — so we built our own.</p>
-  <div class="hero-ctas reveal delay-3">
+  <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="Sovereign Society" class="hero-logo reveal">
+  <div class="hero-eyebrow reveal delay-1">Sovereign Society — by application only</div>
+  <h1 class="reveal delay-2">For the men who<br><em>refused</em> to be<br>average.</h1>
+  <p class="hero-sub reveal delay-3">A private society of operators, builders, and protectors. Deal flow. Accountability. Brotherhood. The system was not built for sovereign men — so we built our own.</p>
+  <div class="hero-ctas reveal delay-4">
     <a href="{{ url_for('pricing') }}" class="btn btn-solid">Apply for Membership</a>
     <a href="{{ url_for('login') }}" class="btn btn-ghost">Member Sign In</a>
   </div>
@@ -622,17 +667,21 @@
 
 <!-- 06 / FINAL CTA -->
 <section class="chapter cta-final" id="cta">
-  <div class="chapter-meta reveal" style="justify-content:center;"><span class="chapter-num">06</span><span class="chapter-tag">The Door</span></div>
-  <h2 class="reveal delay-1">The door is <em>open.</em><br>Walk through it.</h2>
-  <p class="cta-final-sub reveal delay-2">If you're still reading, you already know. The Society does not sell. It selects. Apply, pay, show up, and stand among men who refuse to be average.</p>
-  <div class="hero-ctas reveal delay-3" style="justify-content:center;">
+  <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="cta-seal reveal" aria-hidden="true">
+  <div class="chapter-meta reveal delay-1" style="justify-content:center;"><span class="chapter-num">06</span><span class="chapter-tag">The Door</span></div>
+  <h2 class="reveal delay-2">The door is <em>open.</em><br>Walk through it.</h2>
+  <p class="cta-final-sub reveal delay-3">If you're still reading, you already know. The Society does not sell. It selects. Apply, pay, show up, and stand among men who refuse to be average.</p>
+  <div class="hero-ctas reveal delay-4" style="justify-content:center;">
     <a href="{{ url_for('pricing') }}" class="btn btn-solid">Apply for Membership</a>
     <a href="{{ url_for('login') }}" class="btn btn-ghost">Member Sign In</a>
   </div>
 </section>
 
 <footer>
-  <div>© 2026 Sovereign Society</div>
+  <div class="footer-brand">
+    <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="footer-logo" aria-hidden="true">
+    <span>© 2026 Sovereign Society</span>
+  </div>
   <div class="footer-links">
     <a href="{{ url_for('terms') }}">Terms</a>
     <a href="{{ url_for('privacy') }}">Privacy</a>

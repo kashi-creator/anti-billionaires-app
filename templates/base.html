@@ -11,6 +11,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sovereign">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+    <meta property="og:image" content="{{ url_for('static', filename='img/sovereign-logo.png', _external=True) }}">
+    <meta name="twitter:card" content="summary_large_image">
     <title>{% block title %}Sovereign{% endblock %} | Sovereign Society</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -99,6 +103,7 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{{ url_for('feed') }}" class="nav-logo">
+                <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="nav-logo-img" aria-hidden="true">
                 <span class="logo-text">SOVEREIGN</span>
                 <span class="logo-divider"></span>
                 <span class="logo-tagline">Sovereign Society</span>

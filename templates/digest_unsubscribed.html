@@ -3,7 +3,9 @@
 {% block content %}
 <div class="auth-page">
   <div class="auth-card" style="text-align:center;">
-    <div class="auth-logo">SOVEREIGN</div>
+    <div class="auth-logo">
+      <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="Sovereign Society" class="auth-logo-img">
+    </div>
     <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;margin:24px 0 12px 0;">You're unsubscribed.</h1>
     <p style="color:#888;">No more weekly digests. You'll still get account-critical emails (password resets, payment receipts).</p>
     <p style="margin-top:32px;"><a href="{{ url_for('feed') }}" style="color:#D4AF37;">Back to the Society →</a></p>
