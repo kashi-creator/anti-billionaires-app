@@ -169,7 +169,25 @@ Reference from `templates/landing.html`:
 
 Set up a build pipeline if needed (Vite or esbuild) outside this phase if it does not exist. For first pass, you can ship the JS as a single `landing.js` with everything inlined and CDN-loaded three/lenis/postprocessing.
 
-### B6. Verify locally
+### B6. Build verification (lesson from the Superpowers regression)
+
+Before deploying, verify that index.html (or landing.html) references asset filenames that actually exist on disk. This catches the most common deploy failure mode (HTML references stale bundle hashes from before the latest build).
+
+```bash
+# After vite build, extract every asset reference from the built HTML
+grep -oE 'static/landing/dist/[a-zA-Z0-9._/-]+\.(js|css)' static/landing/dist/index.html | sort -u | while read path; do
+  if [[ -f "$path" ]]; then
+    echo "OK: $path"
+  else
+    echo "MISSING: $path"
+    exit 1
+  fi
+done
+```
+
+If anything reports MISSING, the build is corrupted — re-run `vite build` or investigate before deploying. Never push to Railway with broken asset references.
+
+### B7. Verify locally
 
 ```bash
 flask run   # or however the app is launched
@@ -182,7 +200,7 @@ flask run   # or however the app is launched
 - Particle field renders without console errors
 - Mobile fallback renders the same chapters as a static, scrollable page (no WebGL crash on iOS Safari)
 
-### B7. Commit the landing page cleanly
+### B8. Commit the landing page cleanly
 
 Stage explicit files only:
 ```bash
