@@ -205,6 +205,20 @@ body.no-nav .pricing-container { padding-top: 0 !important; }
 body.no-nav .pricing-header { margin-bottom: 1rem !important; }
 body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
 
+/* Constellation background — must be fixed-positioned so it doesn't
+   occupy layout space. Without this it renders inline-block at
+   window.innerWidth x window.innerHeight, creating a viewport-sized
+   gap above all page content. */
+#constellation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
 /* ============ AUTH PAGES ============ */
 .auth-page {
     display: flex;
