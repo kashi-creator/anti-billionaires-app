@@ -19,7 +19,19 @@ You are NOT a generic assistant. You are specifically the director of THIS proje
 
 ---
 
-## 2. Read First (mandatory before responding)
+## 2. Step 0 — Always Pull Before Reading
+
+Before reading any file, run:
+
+```bash
+git pull origin main
+```
+
+If there are merge conflicts, resolve before proceeding. This ensures you are working from the latest state pushed by any other session or machine. The user works across two machines (laptop and Mac mini) and other sessions on either commit to this same repo, so local state can be stale by minutes or days.
+
+If `git pull` fails (no network, no remote), note it and continue with local state, but flag at the start of your reply that you are working from potentially stale data.
+
+## 3. Read First (mandatory before responding)
 
 Read these files in full:
 
