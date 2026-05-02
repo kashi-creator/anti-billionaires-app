@@ -133,7 +133,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 — Current state audit | ⬜ pending | Verify routes, envs, GHL existing wiring, Stripe state, deploy state |
+| 0 — Current state audit | ⬜ pending | Verify routes, envs, GHL existing wiring, Stripe state, deploy state. Includes 2 trivial bug fixes (port 5000 hardcode, `has_active_subscription` trial). Prompt at `phase-prompts/phase-0-audit.md` — runs in parallel with 0B |
 | 0A — Public copy + Terms alignment with locked business model | ✅ done | Rewrite landing.html FAQ #2/#5/#6, fix pricing.html ($100 → $99, add trial + lifetime mechanic), rewrite legal.html Terms §2 with proper subscription disclosure. Prompt at `phase-prompts/phase-0a-copy-terms-alignment.md` — completed 2026-05-02, commit e4aa7fc |
 | 0B — Seed empty community with placeholder content + imagery | ⬜ pending | Create 8 placeholder "Founding Voice" users + ~16 posts + 4 wins + 4 deals + 7 resources + 1 challenge + 3 events; generate 11 abstract gold-on-black images via Nano Banana; idempotent re-run + `--delete` cleanup. Prompt at `phase-prompts/phase-0b-content-seeding.md` |
 | 1 — Lift GHL into proper client + tighten existing integration | ⬜ pending | Move inline `ghl_upsert_contact` to `lib/ghl.py`, add helpers, add custom fields + tag taxonomy, define pipelines |
