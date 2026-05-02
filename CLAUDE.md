@@ -58,16 +58,19 @@ instance/           # SQLite database
 - Security headers, flash auto-dismiss, activity feed, full-text search
 
 ## Community Spaces (seeded)
-1. The Vault - exclusive deals & opportunities
-2. Business Strategy Room - tactics & growth
-3. Networking Lounge - connections & collabs
-4. Investment Club - portfolio & markets
-5. Wellness & Health - optimization
-6. Creator's Corner - content & brand
+1. Sovereign Wealth — capital allocation, macro, deal flow
+2. Body & Iron — strength, training, discipline
+3. Awake Minds — sovereignty, awakening, contrarian thought
+4. Brotherhood Ops — operations, getting things done together
+5. The Arsenal — tools, systems, builders' workshop
+6. Red Pill Intel — information, signal vs noise
+7. Family & Legacy — fatherhood, generations, building for sons
+8. Off Grid — physical sovereignty, land, security
 
 ## Recurring Events (seeded)
-- Weekly Mastermind Call, Monthly Networking Mixer, Guest Speaker sessions
-- Deal Flow Friday, Wellness Workshops
+- Fire to Fire (regional in-person gatherings)
+- Sovereign Wealth Workshop (monthly, virtual)
+- Brotherhood Summit (annual flagship)
 
 ## Commands
 
