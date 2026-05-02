@@ -144,7 +144,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 
 ## 9. Decisions Log
 
-- _(empty — first session adds entries here)_
+- **2026-05-02 — Business model locked.** Ongoing $99/month subscription, no fixed end. Lifetime access is earned via referrals: when 3 of a member's referrals EACH complete 6 paid months (6 × $99 = $594 per referral), the referring member's billing stops permanently and access becomes lifetime. The `User.payments_made_count`, `User.qualified_referrals_count`, `User.lifetime_access`, and `User.lifetime_qualified_at` fields in `models.py` already reflect this model — no schema change needed. Phase 2 (Stripe → GHL webhook) and Phase 1 (GHL pipelines/tags) must encode this rule: tag `lifetime-qualified` when `lifetime_access` flips to true; tag referrals on each successful payment milestone (1, 3, 6 paid months) so referrers get progress notifications.
 
 ---
 
@@ -157,6 +157,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 - **Stripe subscription cancellation handling** — needs verification (does the app actually downgrade access on cancel?)
 - **Multiple Stripe price IDs?** — one tier today (`STRIPE_PRICE_ID`) — might need annual + monthly + founder pricing
 - **GHL location separate from Stratum's** — must NOT cross-contaminate contact data between businesses
+- **Repo lives in iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Desktop/anti-billionaires-app`).** iCloud syncs both the working tree AND the `.git` folder, which causes ref drift between machines (observed 2026-05-02: local `main` was 10 commits behind origin while `git pull` reported "Already up to date"). Recommend moving repo out of iCloud Drive on both machines (e.g., `~/code/anti-billionaires-app`) and re-cloning fresh from origin. Until then: every session must start with `git fetch origin && git reset --hard origin/main` (after confirming no uncommitted local work) rather than `git pull`, which can silently lie about freshness.
 
 ---
 
