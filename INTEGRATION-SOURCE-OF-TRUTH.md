@@ -117,13 +117,15 @@ This means partial integration EXISTS. Phase 1 audits it.
 | Stage | Tag entry | Description | Channel |
 |-------|-----------|-------------|---------|
 | 0 — Visitor | (anonymous) | Hits landing page | Pixel + retargeting |
-| 1 — Prospect | `prospect` | Signed up free / browsing pricing | Email nurture |
-| 2 — Trial / Signup-no-pay | `signup` | Account created, no subscription | Activation push |
-| 3 — Active Member | `active-member` + tier-specific | Paying subscriber | Engagement loops |
+| 1 — Prospect | `prospect` | Email-only lead (lead magnet, referral landing) — no account, no card | Email nurture |
+| 2 — Trialing | `trialing` | Signed up with card on file, in 30-day free trial (Stripe status `trialing`) | Onboarding + activation push, day-28 conversion reminder |
+| 3 — Active Member | `active-member` + tier-specific | First real charge landed (day 31+, Stripe status `active`) | Engagement loops |
 | 4 — Power Member | `power-member` | High activity (posts, course completion, events) | VIP perks, referral push |
-| 5 — At-Risk | `at-risk` | Low activity 21+ days | Re-engagement |
-| 6 — Cancelled | `cancelled` | Subscription ended | Win-back sequence |
-| 7 — Reactivated | `reactivated` | Came back after cancel | Re-onboarding |
+| 5 — Lifetime-Qualified | `lifetime-qualified` | Earned lifetime access (3 referrals × 6 paid months each) — billing stopped | Recognition + retention reinforcement |
+| 6 — At-Risk | `at-risk` | Low activity 21+ days | Re-engagement |
+| 7a — Trial-Cancelled | `trial-cancelled` | Cancelled during 30-day trial, never charged | Different win-back: re-trial offer or testimonial-led re-engagement |
+| 7b — Member-Cancelled | `cancelled` | Was paying, cancelled subscription | Standard 3-email win-back over 30 days |
+| 8 — Reactivated | `reactivated` | Came back after any cancel | Re-onboarding |
 
 ---
 
@@ -145,6 +147,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 ## 9. Decisions Log
 
 - **2026-05-02 — Business model locked.** Ongoing $99/month subscription, no fixed end. Lifetime access is earned via referrals: when 3 of a member's referrals EACH complete 6 paid months (6 × $99 = $594 per referral), the referring member's billing stops permanently and access becomes lifetime. The `User.payments_made_count`, `User.qualified_referrals_count`, `User.lifetime_access`, and `User.lifetime_qualified_at` fields in `models.py` already reflect this model — no schema change needed. Phase 2 (Stripe → GHL webhook) and Phase 1 (GHL pipelines/tags) must encode this rule: tag `lifetime-qualified` when `lifetime_access` flips to true; tag referrals on each successful payment milestone (1, 3, 6 paid months) so referrers get progress notifications.
+- **2026-05-02 — Free trial model locked.** 30-day free trial, **card required at signup** (Stripe `subscription_data.trial_period_days = 30`). Auto-bills on day 31. No "free account without card" path — every signed-up user has a payment method on file. Implications: (1) Stripe subscription status during trial is `"trialing"`, NOT `"active"` — Phase 0 must update `User.has_active_subscription` in `models.py:120-126` to accept both `"active"` and `"trialing"` or trial users will be paywalled out immediately. (2) §7 (Customer Journey) updated to add `trialing` stage and split `cancelled` into `trial-cancelled` (day 1–30, never charged) vs `cancelled` (paid at least once). These are different win-back audiences with different messaging. (3) `User.payments_made_count` only increments on successful real charges (day 31+), so trial months do NOT count toward referrer qualification — this is intentional and aligns with the locked business model.
 
 ---
 
@@ -155,6 +158,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 - **No Celery** — background tasks use threading. Fine for MVP, watch for race conditions
 - **File uploads stored on Railway disk** — Railway disks are ephemeral on deploys; migrate to S3/R2 before launch
 - **Stripe subscription cancellation handling** — needs verification (does the app actually downgrade access on cancel?)
+- **`User.has_active_subscription` rejects `"trialing"` status** ([models.py:120-126](models.py#L120-L126)) — current code only treats `"active"` as active. With the locked 30-day-trial model, every trial user will be paywalled out the moment they sign up. **Launch blocker.** Phase 0 fixes this — change to `self.subscription_status in ("active", "trialing")`.
 - **Multiple Stripe price IDs?** — one tier today (`STRIPE_PRICE_ID`) — might need annual + monthly + founder pricing
 - **GHL location separate from Stratum's** — must NOT cross-contaminate contact data between businesses
 - **Repo lives in iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Desktop/anti-billionaires-app`).** iCloud syncs both the working tree AND the `.git` folder, which causes ref drift between machines (observed 2026-05-02: local `main` was 10 commits behind origin while `git pull` reported "Already up to date"). Recommend moving repo out of iCloud Drive on both machines (e.g., `~/code/anti-billionaires-app`) and re-cloning fresh from origin. Until then: every session must start with `git fetch origin && git reset --hard origin/main` (after confirming no uncommitted local work) rather than `git pull`, which can silently lie about freshness.
