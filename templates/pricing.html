@@ -58,12 +58,6 @@
             </div>
             <div class="pricing-tagline">Build wealth. Build character. Build together.</div>
 
-            <div style="text-align:center;">
-                <div class="pricing-trial-banner" style="margin: 0.75rem auto 0; padding: 8px 14px; background: rgba(212,175,55,0.08); border: 1px solid rgba(212,175,55,0.25); color: #D4AF37; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; letter-spacing: 2px; text-transform: uppercase; display: inline-block;">
-                    First 30 days free — card on file, no charge until day 31
-                </div>
-            </div>
-
             <div class="form-group" style="margin: 1.5rem 0 1rem;">
                 <input type="email" id="pricing-email" placeholder="Enter your email" class="form-control" style="width:100%;padding:14px 16px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#fff;font-size:1rem;text-align:center;" required>
             </div>
@@ -255,20 +249,21 @@ document.getElementById('checkout-btn').addEventListener('click', async function
             window.location.href = data.checkout_url;
         } else if (data.error && data.error.includes('not configured')) {
             alert('Payment is not set up yet. Use a founder code below to join for free.');
-            // Auto-open the code section
             document.getElementById('code-section').classList.add('active');
             document.getElementById('coupon-code').focus();
             this.textContent = 'Join the Brotherhood';
             this.disabled = false;
+        } else if (data.error) {
+            alert(data.error);
+            this.textContent = 'Join the Brotherhood';
+            this.disabled = false;
         } else {
-            alert('Payment is not set up yet. Use a founder code to join.');
-            document.getElementById('code-section').classList.add('active');
+            alert('Something went wrong. Try again.');
             this.textContent = 'Join the Brotherhood';
             this.disabled = false;
         }
     } catch(err) {
-        alert('Payment is not set up yet. Click "Have a code?" below and enter your founder code.');
-        document.getElementById('code-section').classList.add('active');
+        alert('Network error. Check your connection and try again.');
         this.textContent = 'Join the Brotherhood';
         this.disabled = false;
     }
