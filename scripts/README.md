@@ -24,3 +24,21 @@ python scripts/backfill_ghl_tags.py --apply --throttle-ms 200
 Idempotent — re-running yields the same end state in GHL. See
 `INTEGRATION-SOURCE-OF-TRUTH.md` §6 for the canonical tag taxonomy and §9
 for the Phase 1 lift that introduced this script.
+
+## `invite_admin.py`
+
+Creates (or promotes) a Sovereign Society admin. Sets `is_admin=True`,
+`lifetime_access=True`, `email_verified=True`, and issues a 7-day password-reset
+token. Prints the reset link AND attempts to send a password-reset email.
+
+```bash
+# Local DB:
+python scripts/invite_admin.py <email> "<full name>"
+
+# Production DB (recommended — runs locally with prod env injected):
+railway run python scripts/invite_admin.py <email> "<full name>"
+```
+
+Idempotent — running twice on the same email refreshes the reset token without
+disturbing existing data. After running, also add the email to `ADMIN_EMAILS`
+env var on Railway to satisfy the defense-in-depth allowlist in `app.py:180`.
