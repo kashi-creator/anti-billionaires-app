@@ -1,7 +1,6 @@
 import os
 import uuid
 import json
-import threading
 from datetime import datetime, date
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
@@ -14,7 +13,6 @@ from werkzeug.utils import secure_filename
 import bcrypt
 import secrets
 import stripe
-import requests
 from datetime import timedelta
 from email_send import (
     send_email, send_welcome_verify, send_password_reset,
@@ -34,6 +32,7 @@ from models import (
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
+from lib import ghl
 
 app = Flask(__name__)
 
@@ -63,6 +62,17 @@ if _db_url.startswith("postgresql://"):
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB max upload
 app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "uploads")
 
+# SERVER_NAME enables `url_for(..., _external=True)` to resolve outside a
+# request context (e.g. inside email-rendering daemon threads, CLI commands
+# like `flask cron digest`). Without it, those code paths throw RuntimeError
+# and the HTML email body silently fails to render. Set the env var in
+# Railway to the canonical host; locally we leave it None so dev binding
+# to 127.0.0.1:5000 keeps working.
+app.config["SERVER_NAME"] = os.environ.get("SERVER_NAME") or (
+    "anti-billionaires-app-production.up.railway.app" if ENV == "production" else None
+)
+app.config["PREFERRED_URL_SCHEME"] = "https"
+
 # Session cookie hardening
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -85,9 +95,9 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "whsec_placehold
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "price_placeholder")
 stripe.api_key = STRIPE_SECRET_KEY
 
-# GHL config
-GHL_API_KEY = os.environ.get("GHL_API_KEY", "")
-GHL_LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "")
+# GHL config — env vars are read inside lib/ghl.py at call time.
+# `GHL_API_KEY` and `GHL_LOCATION_ID` are required for live writes; if either
+# is unset the client no-ops. Pipeline / stage IDs are optional (Phase 2 scope).
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -234,39 +244,8 @@ def subscription_required(f):
 
 
 # ===== GHL INTEGRATION =====
-
-def ghl_upsert_contact(email, name, tags=None, phone=None):
-    """Upsert a contact in GoHighLevel. Non-blocking via threading."""
-    if not GHL_API_KEY or not GHL_LOCATION_ID:
-        return
-
-    def _do_upsert():
-        try:
-            headers = {
-                "Authorization": f"Bearer {GHL_API_KEY}",
-                "Content-Type": "application/json",
-                "Version": "2021-07-28",
-            }
-            payload = {
-                "email": email,
-                "name": name,
-                "locationId": GHL_LOCATION_ID,
-            }
-            if tags:
-                payload["tags"] = tags
-            if phone:
-                payload["phone"] = phone
-            requests.post(
-                "https://services.leadconnectorhq.com/contacts/upsert",
-                headers=headers,
-                json=payload,
-                timeout=10,
-            )
-        except Exception:
-            pass  # Non-blocking, fail silently
-
-    t = threading.Thread(target=_do_upsert, daemon=True)
-    t.start()
+# All GHL writes go through `lib/ghl.py` (Phase 1). Stage tags only — see
+# INTEGRATION-SOURCE-OF-TRUTH.md §6 for the canonical taxonomy.
 
 
 @login_manager.user_loader
@@ -807,7 +786,8 @@ def signup():
         db.session.add(user)
         db.session.commit()
 
-        ghl_upsert_contact(email, name, tags=["ABMC"])
+        # Free signup, no card on file — pure prospect (no trial yet).
+        ghl.upsert_contact(email=email, name=name, stage_tag="prospect")
 
         flash("Account created. Complete your membership to gain access.", "success")
         return redirect(url_for("pricing"))
@@ -863,8 +843,12 @@ def signup_with_code():
     db.session.add(user)
     db.session.commit()
 
-    # GHL push — legacy taxonomy (Phase 1 sweeps to canonical lifetime-qualified).
-    ghl_upsert_contact(email, name, tags=["Lifetime", "ABMC"])
+    # GHL push — canonical lifetime-qualified taxonomy (Phase 1).
+    ghl.upsert_contact(
+        email=email, name=name,
+        stage_tag="lifetime-qualified",
+        custom_fields=ghl.custom_fields_from_user(user),
+    )
 
     # Welcome email — graceful degrade if RESEND_API_KEY is unset.
     try:
@@ -1433,7 +1417,11 @@ def subscription_success():
         # Trigger welcome + verify email
         send_verification_email(user)
 
-        ghl_upsert_contact(email, name, tags=["Paid Member", "Sovereign Society"])
+        ghl.upsert_contact(
+            email=email, name=name,
+            stage_tag="trialing",
+            custom_fields=ghl.custom_fields_from_user(user),
+        )
         flash("Welcome to the Society. Check your email to confirm.", "success")
         return redirect(url_for("onboarding"))
 
@@ -1520,7 +1508,14 @@ def _handle_subscription_deleted(data):
         return
     user.subscription_status = "canceled"
     db.session.commit()
-    ghl_upsert_contact(user.email, user.name, tags=["Churned", "ABMC"])
+    # Trial-cancelled (never charged) is a different audience from member-cancelled
+    # (paid at least once). Different win-back messaging in GHL workflows.
+    cancel_tag = "trial-cancelled" if (user.payments_made_count or 0) == 0 else "cancelled"
+    ghl.upsert_contact(
+        email=user.email, name=user.name,
+        stage_tag=cancel_tag,
+        custom_fields=ghl.custom_fields_from_user(user),
+    )
 
 
 def _handle_payment_succeeded(data):
@@ -1582,9 +1577,22 @@ def _handle_payment_succeeded(data):
         except Exception as e:
             print(f"[EMAIL] referral progress failed: {e}")
 
+    # Phase 1: keep custom fields fresh on every successful payment, even when
+    # the user did not just unlock their referrer's lifetime. Phase 2 widens
+    # this to checkout.completed / sub.updated / payment_failed.
+    ghl.upsert_contact(
+        email=user.email, name=user.name,
+        stage_tag="active-member",
+        custom_fields=ghl.custom_fields_from_user(user),
+    )
+
     if referrer_unlocked_lifetime:
         send_lifetime_unlocked(referrer)
-        ghl_upsert_contact(referrer.email, referrer.name, tags=["Lifetime", "ABMC"])
+        ghl.upsert_contact(
+            email=referrer.email, name=referrer.name,
+            stage_tag="lifetime-qualified",
+            custom_fields=ghl.custom_fields_from_user(referrer),
+        )
 
 
 def _handle_payment_failed(data):
