@@ -120,7 +120,54 @@ User profile (`/profile/<id>`) gets a "Projects" section showing the user's acti
 
 Optional 8th checklist item (NOT shipping in this phase, but design to support): "Post a project — share what you're building." Slug `post-project`. If it's added, auto-check fires on first `Project` creation via the slug-based helper from Phase 4.
 
-### 2.6 What does NOT happen here
+### 2.6 Payment methods (Kashi added 2026-05-03)
+
+Project creators can publish multiple payment methods so members can send them money directly. **Sovereign Society does NOT process the payments** — we're a directory of addresses/handles. The transaction happens off-platform between the two members. This keeps SS out of money-transmitter / KYC / AML compliance entirely.
+
+Add a `ProjectPaymentMethod` table:
+```python
+class ProjectPaymentMethod(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False, index=True)
+    method_type = db.Column(db.String(40), nullable=False)
+    address_or_handle = db.Column(db.String(500), nullable=False)
+    label = db.Column(db.String(100), default="")
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+```
+
+Locked `method_type` vocab:
+- `eth` — Ethereum address (0x... 42 chars)
+- `btc` — Bitcoin address (multiple format types — basic length check only)
+- `sol` — Solana address (base58, 32–44 chars)
+- `usdc_eth` — USDC on Ethereum (same format as eth)
+- `usdc_sol` — USDC on Solana (same format as sol)
+- `cashapp` — `$cashtag`
+- `venmo` — `@venmo-handle`
+- `paypal` — paypal.me URL
+- `stripe_link` — `https://buy.stripe.com/...` (creator's own Stripe Payment Link, NOT related to SS Stripe)
+- `custom_link` — any URL (kept for fallback; show "external link" warning to user before redirect)
+
+Server-side validation: cheap regex per type (don't try to verify on-chain that the address resolves; just shape-check). Reject bad shapes with a clear error.
+
+Project detail page renders a "Support this builder" section listing all configured methods. Each method has:
+- Icon (lucide icon or simple letter mark)
+- Label (or "Crypto: ETH" if no label)
+- Address/handle
+- "Copy" button (clipboard.writeText)
+- For URL-type methods: "Open" button (target=_blank rel=noopener)
+
+**Disclaimer banner above the list (load-bearing — keeps SS out of money-transmitter regulation):**
+> "Sovereign Society does not process these payments. You're transacting directly with the project creator off-platform. We do not custody, escrow, or refund. Use your own judgment and verify with the creator before sending."
+
+Routes:
+- `POST /projects/<id>/payment-method` — creator adds one
+- `DELETE /projects/<id>/payment-method/<pm_id>` — creator removes
+- (No public read route needed; payment methods are loaded as part of project detail.)
+
+Project creators can have 0–N methods per project. Soft cap at 10 (server-side validation). Methods are visible to anyone who can view the project (visibility tier still applies — `private` and `brotherhood_only` payment methods are gated).
+
+### 2.7 What does NOT happen here
 
 - Do NOT add the checklist item (Phase 4's checklist is final at 7 items; if Kashi wants Projects in the list, that's a Phase 4.1 follow-up).
 - Do NOT integrate with GHL (no engagement-tagging on project create — Phase 8 territory).
@@ -226,21 +273,24 @@ Three commits:
 
 **Commit 1 — schema:**
 ```
-phase-7: project + project_update + project_interest models + migration
+phase-7: project + project_update + project_interest + project_payment_method models + migration
 ```
 
-**Commit 2 — routes + visibility helper:**
+**Commit 2 — routes + visibility helper + payment-method routes:**
 ```
-phase-7: /projects feed + detail + create/edit + interest + update routes
+phase-7: /projects feed + detail + create/edit + interest + update + payment-method routes
 
 - visibility tiers: members_only / brotherhood_only / private
-- @validates locks status/project_type/visibility vocab
+- @validates locks status/project_type/visibility/method_type vocab
 - toggle-interest (idempotent), creator-only updates, soft-archive
+- payment methods: 10 locked types (eth, btc, sol, usdc_*, cashapp, venmo,
+  paypal, stripe_link, custom_link); shape validation per type; soft cap 10/project;
+  ss does NOT process payments — directory only, off-platform transaction
 ```
 
 **Commit 3 — templates + nav + sot:**
 ```
-phase-7: projects ui + nav entry + sot
+phase-7: projects ui + payment-method ui + load-bearing disclaimer + nav entry + sot
 ```
 
 ---
