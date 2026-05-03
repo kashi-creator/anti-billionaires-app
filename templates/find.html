@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Find Brothers{% endblock %}
+
+{% block content %}
+<style>
+  .find-wrap { max-width: 720px; margin: 40px auto; padding: 0 20px; }
+  .find-h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 36px; color: #fff; margin: 0 0 8px 0; letter-spacing: -0.5px;
+  }
+  .find-sub { color: #888; margin-bottom: 32px; line-height: 1.5; }
+
+  .find-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid #1f1f1f; margin-bottom: 28px;
+  }
+  .find-tab {
+    flex: 1; padding: 14px 12px; background: transparent; border: 0;
+    color: #888; font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; border-bottom: 2px solid transparent; font-weight: 600;
+    font-family: inherit;
+  }
+  .find-tab.active { color: #D4AF37; border-bottom-color: #D4AF37; }
+  .find-pane { display: none; }
+  .find-pane.active { display: block; }
+
+  .find-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px; padding: 28px 24px;
+  }
+  .find-label {
+    display: block; font-size: 12px; color: #aaa;
+    margin: 12px 0 6px 0; letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .find-input, .find-select {
+    width: 100%; padding: 13px 14px; background: #0a0a0a; border: 1px solid #2a2a2a;
+    color: #fff; font-size: 15px; border-radius: 6px; box-sizing: border-box;
+    font-family: inherit;
+  }
+  .find-input:focus, .find-select:focus { outline: none; border-color: #D4AF37; }
+  .find-row { display: flex; gap: 12px; }
+  .find-row .find-input { flex: 1; }
+  .find-row .find-select { flex: 0 0 140px; }
+
+  .find-btn {
+    margin-top: 20px; padding: 13px 24px;
+    background: linear-gradient(135deg, #D4AF37, #B8941F);
+    color: #0A0A0A; font-weight: bold; letter-spacing: 2px;
+    text-transform: uppercase; font-size: 13px; border: none;
+    border-radius: 4px; cursor: pointer; width: 100%;
+    font-family: inherit;
+  }
+  .find-btn[disabled] { opacity: 0.5; cursor: wait; }
+
+  .find-results { margin-top: 28px; }
+  .find-result {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px; background: #0e0e0e;
+    border: 1px solid #1f1f1f; border-radius: 8px;
+    margin-bottom: 10px; text-decoration: none; color: inherit;
+    transition: border-color 0.15s;
+  }
+  .find-result:hover { border-color: #D4AF37; }
+  .find-avatar {
+    width: 48px; height: 48px; border-radius: 50%; flex: 0 0 48px;
+    background: #1a1a1a; overflow: hidden; display: flex;
+    align-items: center; justify-content: center;
+    color: #D4AF37; font-weight: bold; font-size: 18px;
+  }
+  .find-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .find-result-name { color: #fff; font-weight: 600; font-size: 15px; }
+  .find-result-meta { color: #888; font-size: 13px; margin-top: 2px; }
+  .find-result-distance {
+    margin-left: auto; color: #D4AF37; font-size: 13px;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: 1px;
+  }
+
+  .find-empty {
+    text-align: center; color: #666; padding: 32px 16px;
+    border: 1px dashed #1f1f1f; border-radius: 8px;
+  }
+  .find-error {
+    color: #c66; padding: 12px 14px; background: rgba(180,60,60,0.08);
+    border: 1px solid rgba(180,60,60,0.3); border-radius: 6px;
+    margin-top: 14px; font-size: 14px;
+  }
+  .find-loading { color: #888; text-align: center; padding: 18px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+
+  @media (max-width: 600px) {
+    .find-wrap { margin: 20px auto; }
+    .find-h1 { font-size: 28px; }
+    .find-row { flex-direction: column; }
+    .find-row .find-select { flex: 1; }
+  }
+</style>
+
+<div class="find-wrap">
+  <h1 class="find-h1">Find brothers near you.</h1>
+  <p class="find-sub">Search by city to see who's already in your area, or use your current location to surface the closest brothers.</p>
+
+  <div class="find-tabs">
+    <button class="find-tab active" type="button" data-pane="search">Who's in your city</button>
+    <button class="find-tab" type="button" data-pane="nearby">Brothers in your area</button>
+  </div>
+
+  <div class="find-pane active" id="pane-search">
+    <div class="find-card">
+      <label class="find-label" for="cityInput">City or region</label>
+      <div class="find-row">
+        <input class="find-input" type="text" id="cityInput" placeholder="e.g. Austin, TX" autocomplete="off">
+        <select class="find-select" id="radiusSelect">
+          <option value="25">25 mi</option>
+          <option value="50">50 mi</option>
+          <option value="100">100 mi</option>
+        </select>
+      </div>
+      <button class="find-btn" type="button" id="searchBtn">Search</button>
+      <div id="searchError"></div>
+      <div class="find-results" id="searchResults"></div>
+    </div>
+  </div>
+
+  <div class="find-pane" id="pane-nearby">
+    <div class="find-card">
+      <p style="color:#888; margin: 0 0 14px 0; line-height:1.5;">We'll ask your browser for your current location and surface the 20 closest brothers who've opted in to proximity visibility.</p>
+      <button class="find-btn" type="button" id="nearbyBtn">Use my current location</button>
+      <div id="nearbyError"></div>
+      <div class="find-results" id="nearbyResults"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+  document.querySelectorAll('.find-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.find-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.find-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('pane-' + btn.dataset.pane).classList.add('active');
+    });
+  });
+
+  function avatarHtml(r) {
+    if (r.profile_photo) {
+      return '<div class="find-avatar"><img src="/static/' + r.profile_photo + '" alt=""></div>';
+    }
+    const initial = (r.name || '?').charAt(0).toUpperCase();
+    return '<div class="find-avatar">' + initial + '</div>';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderResults(container, results, emptyMsg) {
+    if (!results.length) {
+      container.innerHTML = '<div class="find-empty">' + emptyMsg + '</div>';
+      return;
+    }
+    container.innerHTML = results.map(r => {
+      const loc = [r.city, r.country].filter(Boolean).join(', ');
+      return '<a class="find-result" href="/profile/' + r.id + '">'
+        + avatarHtml(r)
+        + '<div>'
+        +   '<div class="find-result-name">' + escapeHtml(r.name) + '</div>'
+        +   '<div class="find-result-meta">' + escapeHtml(loc) + '</div>'
+        + '</div>'
+        + '<div class="find-result-distance">' + r.miles + ' mi</div>'
+        + '</a>';
+    }).join('');
+  }
+
+  function showError(el, msg) { el.innerHTML = '<div class="find-error">' + escapeHtml(msg) + '</div>'; }
+  function clearError(el) { el.innerHTML = ''; }
+
+  const searchBtn = document.getElementById('searchBtn');
+  const searchResults = document.getElementById('searchResults');
+  const searchError = document.getElementById('searchError');
+  const cityInput = document.getElementById('cityInput');
+
+  function runSearch() {
+    const city = cityInput.value.trim();
+    const radius = parseInt(document.getElementById('radiusSelect').value, 10);
+    if (!city) { showError(searchError, 'Enter a city.'); return; }
+    clearError(searchError);
+    searchResults.innerHTML = '<div class="find-loading">Searching…</div>';
+    searchBtn.disabled = true;
+    fetch('/find/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ city: city, radius_miles: radius })
+    }).then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+      .then(({ ok, body }) => {
+        searchBtn.disabled = false;
+        if (!ok) {
+          searchResults.innerHTML = '';
+          showError(searchError, body.error || 'Search failed.');
+          return;
+        }
+        const c = body.center;
+        renderResults(
+          searchResults,
+          body.results || [],
+          'No brothers found within ' + radius + ' mi of ' + escapeHtml(c.city) + '.'
+        );
+      })
+      .catch(() => {
+        searchBtn.disabled = false;
+        searchResults.innerHTML = '';
+        showError(searchError, 'Network error. Try again.');
+      });
+  }
+  searchBtn.addEventListener('click', runSearch);
+  cityInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+  const nearbyBtn = document.getElementById('nearbyBtn');
+  const nearbyResults = document.getElementById('nearbyResults');
+  const nearbyError = document.getElementById('nearbyError');
+
+  nearbyBtn.addEventListener('click', () => {
+    clearError(nearbyError);
+    if (!navigator.geolocation) {
+      showError(nearbyError, 'Geolocation is not available in this browser.');
+      return;
+    }
+    nearbyResults.innerHTML = '<div class="find-loading">Detecting location…</div>';
+    nearbyBtn.disabled = true;
+    navigator.geolocation.getCurrentPosition(pos => {
+      fetch('/find/nearby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      }).then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+        .then(({ ok, body }) => {
+          nearbyBtn.disabled = false;
+          if (!ok) {
+            nearbyResults.innerHTML = '';
+            showError(nearbyError, body.error || 'Could not find nearby members.');
+            return;
+          }
+          renderResults(
+            nearbyResults,
+            body.results || [],
+            'No brothers nearby yet. Check back as the Society grows.'
+          );
+        })
+        .catch(() => {
+          nearbyBtn.disabled = false;
+          nearbyResults.innerHTML = '';
+          showError(nearbyError, 'Network error. Try again.');
+        });
+    }, () => {
+      nearbyBtn.disabled = false;
+      nearbyResults.innerHTML = '';
+      showError(nearbyError, 'Location permission denied or unavailable.');
+    }, { timeout: 10000 });
+  });
+})();
+</script>
+{% endblock %}

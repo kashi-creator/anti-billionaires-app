@@ -33,6 +33,33 @@
             <button type="submit" class="btn btn-gold btn-full">Save Changes</button>
             <a href="{{ url_for('profile', user_id=current_user.id) }}" class="btn btn-ghost btn-full" style="margin-top:0.5rem">Cancel</a>
         </form>
+
+        <hr style="margin:2rem 0; border:0; border-top:1px solid #1f1f1f;">
+
+        <h2 style="font-size:18px; color:#fff; margin:0 0 6px 0;">Who can see your location?</h2>
+        <p style="color:#888; font-size:13px; margin:0 0 16px 0; line-height:1.5;">
+          Controls how you appear in the Find Brothers feature.
+          Your exact coordinates are never shown to other members — only your city.
+        </p>
+        {% set vis = current_user.location_visibility or 'city_only' %}
+        <form method="POST" action="{{ url_for('features.update_location_visibility') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="display:flex; gap:10px; padding:12px 14px; background:#0a0a0a; border:1px solid #2a2a2a; border-radius:6px; color:#bbb; font-size:14px; line-height:1.4; cursor:pointer;">
+              <input type="radio" name="location_visibility" value="city_only" style="margin-top:3px; accent-color:#D4AF37;" {% if vis == 'city_only' %}checked{% endif %}>
+              <span><strong style="color:#fff;">City only</strong> — other members can find you by city search. (default)</span>
+            </label>
+            <label style="display:flex; gap:10px; padding:12px 14px; background:#0a0a0a; border:1px solid #2a2a2a; border-radius:6px; color:#bbb; font-size:14px; line-height:1.4; cursor:pointer;">
+              <input type="radio" name="location_visibility" value="proximity_visible" style="margin-top:3px; accent-color:#D4AF37;" {% if vis == 'proximity_visible' %}checked{% endif %}>
+              <span><strong style="color:#fff;">City + nearby</strong> — also surface me when a brother is in my area.</span>
+            </label>
+            <label style="display:flex; gap:10px; padding:12px 14px; background:#0a0a0a; border:1px solid #2a2a2a; border-radius:6px; color:#bbb; font-size:14px; line-height:1.4; cursor:pointer;">
+              <input type="radio" name="location_visibility" value="hidden" style="margin-top:3px; accent-color:#D4AF37;" {% if vis == 'hidden' %}checked{% endif %}>
+              <span><strong style="color:#fff;">Hidden</strong> — don't show my location anywhere.</span>
+            </label>
+          </div>
+          <button type="submit" class="btn btn-ghost btn-full" style="margin-top:1rem;">Save Visibility</button>
+        </form>
     </div>
 </div>
 {% endblock %}

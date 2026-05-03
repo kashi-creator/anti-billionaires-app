@@ -61,6 +61,15 @@
   .ob-space-name { color:#fff; font-weight:bold; margin-bottom:4px; font-size:15px; }
   .ob-space-desc { color:#888; font-size:13px; line-height:1.4; }
 
+  .ob-vis { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .ob-vis-row {
+    display:flex; align-items:flex-start; gap:10px;
+    padding:12px 14px; background:#0a0a0a; border:1px solid #2a2a2a;
+    border-radius:6px; cursor:pointer; color:#bbb; font-size:14px; line-height:1.4;
+  }
+  .ob-vis-row input { margin-top:3px; accent-color:#D4AF37; }
+  .ob-vis-row strong { color:#fff; }
+
   @media (max-width: 600px) {
     .ob-wrap { margin: 24px auto; padding: 0 16px; }
     .ob-card { padding: 32px 20px; }
@@ -113,6 +122,23 @@
         <input class="ob-input" type="text" name="country" placeholder="e.g. USA" value="{{ current_user.country or '' }}">
         <input type="hidden" id="lat" name="lat" value="{{ current_user.lat or '' }}">
         <input type="hidden" id="lng" name="lng" value="{{ current_user.lng or '' }}">
+
+        <label class="ob-label" style="margin-top:24px">Who can see this?</label>
+        {% set vis = current_user.location_visibility or 'city_only' %}
+        <div class="ob-vis">
+          <label class="ob-vis-row">
+            <input type="radio" name="location_visibility" value="city_only" {% if vis == 'city_only' %}checked{% endif %}>
+            <span><strong>City only</strong> — other members can find you by city search. (default)</span>
+          </label>
+          <label class="ob-vis-row">
+            <input type="radio" name="location_visibility" value="proximity_visible" {% if vis == 'proximity_visible' %}checked{% endif %}>
+            <span><strong>City + nearby</strong> — also surface me when a brother is in my area.</span>
+          </label>
+          <label class="ob-vis-row">
+            <input type="radio" name="location_visibility" value="hidden" {% if vis == 'hidden' %}checked{% endif %}>
+            <span><strong>Hidden</strong> — don't show my location anywhere.</span>
+          </label>
+        </div>
 
       {% elif step == 4 %}
         <h1 class="ob-h1">Pick your spaces.</h1>

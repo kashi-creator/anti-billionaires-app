@@ -978,6 +978,118 @@ def update_location():
     return redirect(url_for('edit_profile'))
 
 
+@features.route('/profile/visibility', methods=['POST'])
+@login_required
+def update_location_visibility():
+    """Phase 6: 3-tier privacy for the location feature."""
+    val = (request.form.get("location_visibility") or "").strip()
+    if val not in ("hidden", "city_only", "proximity_visible"):
+        flash("Invalid visibility setting.", "error")
+        return redirect(url_for('edit_profile'))
+    current_user.location_visibility = val
+    # Mirror legacy show_on_map so the existing /map page respects the choice.
+    current_user.show_on_map = (val != "hidden")
+    db.session.commit()
+    flash("Location visibility updated.", "success")
+    return redirect(url_for('edit_profile'))
+
+
+# =====================================================================
+#  FIND BROTHERS — search by city + proximity (Phase 6)
+# =====================================================================
+
+@features.route('/find')
+@login_required
+def find_brothers():
+    # Mirrors `app.paywall_required` body. Inlined to avoid a circular import
+    # (features_routes is imported during app.py module load).
+    if not current_user.has_active_subscription:
+        flash("Membership required to access this area.", "warning")
+        return redirect(url_for('pricing'))
+    if not current_user.onboarding_complete:
+        return redirect(url_for('onboarding'))
+    return render_template('find.html')
+
+
+@features.route('/find/search', methods=['POST'])
+@login_required
+def find_search():
+    if not current_user.has_active_subscription:
+        return jsonify({"error": "membership required"}), 403
+    from lib.geocoding import geocode_city, haversine_miles
+    data = request.get_json(silent=True) or {}
+    city = (data.get("city") or "").strip()
+    try:
+        radius = int(data.get("radius_miles") or 25)
+    except (TypeError, ValueError):
+        radius = 25
+    radius = max(1, min(radius, 500))
+    if not city:
+        return jsonify({"error": "city required"}), 400
+    coords = geocode_city(city)
+    if not coords:
+        return jsonify({"error": "could not locate that city"}), 400
+    target_lat, target_lng = coords
+    candidates = User.query.filter(
+        User.location_visibility != "hidden",
+        User.lat.isnot(None),
+        User.lng.isnot(None),
+    ).all()
+    results = []
+    for u in candidates:
+        if u.id == current_user.id:
+            continue
+        d = haversine_miles(target_lat, target_lng, u.lat, u.lng)
+        if d <= radius:
+            results.append({
+                "id": u.id,
+                "name": u.name,
+                "city": u.city or "",
+                "country": u.country or "",
+                "miles": round(d, 1),
+                "profile_photo": u.profile_photo,
+            })
+    results.sort(key=lambda x: x["miles"])
+    return jsonify({
+        "results": results,
+        "center": {"lat": target_lat, "lng": target_lng, "city": city},
+    })
+
+
+@features.route('/find/nearby', methods=['POST'])
+@login_required
+def find_nearby():
+    if not current_user.has_active_subscription:
+        return jsonify({"error": "membership required"}), 403
+    from lib.geocoding import haversine_miles
+    data = request.get_json(silent=True) or {}
+    try:
+        lat = float(data.get("lat"))
+        lng = float(data.get("lng"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "lat,lng required"}), 400
+    candidates = User.query.filter(
+        User.location_visibility == "proximity_visible",
+        User.lat.isnot(None),
+        User.lng.isnot(None),
+    ).all()
+    results = []
+    for u in candidates:
+        if u.id == current_user.id:
+            continue
+        d = haversine_miles(lat, lng, u.lat, u.lng)
+        results.append({
+            "id": u.id,
+            "name": u.name,
+            "city": u.city or "",
+            "country": u.country or "",
+            "miles": round(d, 1),
+            "profile_photo": u.profile_photo,
+        })
+    results.sort(key=lambda x: x["miles"])
+    return jsonify({"results": results[:20]})
+
+
 # =====================================================================
 #  1-ON-1 CALL BOOKING
 # =====================================================================
