@@ -21,8 +21,12 @@ The link works regardless of email delivery — DM it to the invitee as a fallba
 """
 
 import sys
+import os
 import secrets
 from datetime import datetime, timedelta, date
+
+# Make repo root importable when run as `python scripts/invite_admin.py`
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import bcrypt
 
@@ -76,7 +80,7 @@ def invite_admin(email: str, name: str) -> None:
         print(f"Reset link (valid 7 days): {reset_link}")
 
         try:
-            send_password_reset(user)
+            send_password_reset(user, reset_link)
             print("Password-reset email dispatched")
         except Exception as e:
             print(f"WARN: send_password_reset failed: {e}")
