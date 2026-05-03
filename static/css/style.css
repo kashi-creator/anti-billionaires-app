@@ -174,7 +174,16 @@ img { max-width: 100%; height: auto; }
     border-top: 1px solid var(--border);
 }
 
-.mobile-menu.open { display: flex; }
+.mobile-menu.open {
+    display: flex;
+    max-height: calc(100vh - 72px);
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.menu-open { overflow: hidden; }
 
 .mobile-link {
     padding: 0.85rem 0;

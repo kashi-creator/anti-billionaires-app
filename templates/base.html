@@ -295,7 +295,9 @@
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script>
         function toggleMobileMenu() {
-            document.getElementById('mobileMenu').classList.toggle('open');
+            const menu = document.getElementById('mobileMenu');
+            const opened = menu.classList.toggle('open');
+            document.body.classList.toggle('menu-open', opened);
         }
 
         // Auto-dismiss flash messages
