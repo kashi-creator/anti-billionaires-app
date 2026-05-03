@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}The Manifesto{% endblock %}
+
+{% block content %}
+<style>
+.manifesto-page {
+    min-height: 100vh;
+    padding: 5rem 1.5rem 6rem;
+    display: flex;
+    justify-content: center;
+}
+.manifesto-column {
+    max-width: 720px;
+    width: 100%;
+    color: #E8E5DD;
+}
+.manifesto-eyebrow {
+    font-family: 'JetBrains Mono', 'Inter', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #D4AF37;
+    margin-bottom: 2rem;
+    opacity: 0.8;
+}
+.manifesto-title {
+    font-family: 'Cormorant Garamond', 'Fraunces', serif;
+    font-weight: 400;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    line-height: 1.05;
+    margin: 0 0 3rem;
+    color: #F4F1E8;
+}
+.manifesto-title em {
+    font-style: italic;
+    color: #D4AF37;
+}
+.manifesto-body p {
+    font-family: 'Cormorant Garamond', 'Fraunces', serif;
+    font-weight: 300;
+    font-size: clamp(1.25rem, 2.2vw, 1.55rem);
+    line-height: 1.7;
+    margin: 0 0 1.75rem;
+    color: #D8D5CC;
+}
+.manifesto-body strong {
+    color: #D4AF37;
+    font-weight: 500;
+}
+.manifesto-divider {
+    width: 60px;
+    height: 1px;
+    background: #D4AF37;
+    margin: 4rem auto 3rem;
+    opacity: 0.5;
+}
+.manifesto-back {
+    text-align: center;
+    margin-top: 3rem;
+}
+.manifesto-back a {
+    display: inline-block;
+    padding: 0.9rem 2.25rem;
+    border: 1px solid #D4AF37;
+    color: #D4AF37;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: background 0.25s ease, color 0.25s ease;
+}
+.manifesto-back a:hover {
+    background: #D4AF37;
+    color: #0A0A0A;
+}
+@media (max-width: 600px) {
+    .manifesto-page { padding: 3rem 1.25rem 5rem; }
+}
+</style>
+
+<div class="manifesto-page">
+    <div class="manifesto-column">
+        <div class="manifesto-eyebrow">01 / The Manifesto</div>
+        <h1 class="manifesto-title">We are living in an<br><em>engineered</em> reality.</h1>
+        <div class="manifesto-body">
+            <p>The food is poisoned. The money is fake. History is sanitized. And our men are weak. The architects of this system do not want you strong, sovereign, or awake.</p>
+            <p>They want you medicated. Dependent. Distracted. <strong>We refuse the terms of this surrender.</strong></p>
+            <p>This is not a political movement. It is a reclamation of masculine power. A brotherhood of builders, thinkers, and protectors who chose to step out of the chaos and into purpose. We do not just complain about the dark. We build the fire.</p>
+        </div>
+        <div class="manifesto-divider"></div>
+        <div class="manifesto-back">
+            <a href="{{ url_for('feed') }}">Back to the Society</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
