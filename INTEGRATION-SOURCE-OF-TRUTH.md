@@ -11,10 +11,10 @@
 - **Repo:** github.com/kashi-creator/anti-billionaires-app
 - **Local repo (laptop):** `~/Desktop/anti-billionaires-app`
 - **Local repo (Mac mini):** [TBD — clone path]
-- **Hosted:** Railway (project name TBD — Phase 0 confirms)
-- **Live URL:** [TBD — Phase 0 fills]
-- **Custom domain:** [TBD]
-- **GHL location ID:** [TBD — Phase 1 fills, separate from Stratum's location]
+- **Hosted:** Railway (project name still [TBD] — Railway CLI not linked from this machine; confirm via Railway dashboard)
+- **Live URL:** `https://onepercentmensclub.up.railway.app` (declared in `capacitor.config.json:7`). **Currently NOT serving the app** — `curl -I` against `/`, `/pricing`, `/healthz` all return HTTP 404 with `x-railway-fallback: true` (Railway edge fallback, no service bound to that host). Production is down or the Railway service is paused. **Launch blocker.** See §10.
+- **Custom domain:** [TBD] — no custom domain configured yet; `sovereignsociety.com` is the likely target per Phase 0A but not wired.
+- **GHL location ID:** [TBD — Phase 1 fills, separate from Stratum's location]. Not in local env.
 - **Stripe account:** existing (separate from Stratum)
 
 ---
@@ -60,33 +60,75 @@ Major feature areas, each with its own DB models + routes + templates:
 
 ---
 
-## 4. Routes Inventory (current state — Phase 0 should verify completeness)
+## 4. Routes Inventory
 
-Auth: `/login`, `/signup`, `/logout`, `/reset-pwd/<secret>`
-Feed: `/`, `/feed`, `/like/<id>`, `/comment/<id>`, `/post/<id>`
-Profile: `/profile/<id>`, `/profile/edit`, `/members`, `/leaderboard`, `/follow/<id>`
-Spaces: `/spaces`, `/space/<id>`, `/space/create`, `/space/<id>/join`, `/space/<id>/leave`, `/space/<id>/post`
-Notifications: `/notifications`, `/notifications/read`, `/api/notifications/unread-count`, `/api/notifications/recent`
-Polls: `/poll/vote/<id>`
-Subscriptions: `/pricing`, `/validate-code`, `/create-checkout-session`
-Plus routes from `phase3_routes.py` and `features_routes.py` (Phase 0 lists these)
+Verified by Phase 0 audit (2026-05-02). Total: **105 routes** across `app.py` (54) + `phase3_routes.py` (9) + `features_routes.py` (42). Full list — see §13.1 below.
+
+**By area (summary):**
+- Public: `/`, `/terms`, `/privacy`, `/pricing`, `/r/<code>` (referral landing)
+- Auth: `/login`, `/signup`, `/logout`, `/forgot-password`, `/reset-password/<token>`, `/verify-email/<token>`, `/resend-verification`
+- Onboarding: `/onboarding` (GET/POST, 5 steps)
+- Feed: `/feed` (GET/POST), `/like/<id>`, `/comment/<id>`, `/post/<id>` (DELETE), `/poll/vote/<id>`
+- Profile: `/profile/<id>`, `/profile/edit`, `/members`, `/leaderboard`, `/follow/<id>`, `/profile/location`
+- Spaces: `/spaces`, `/space/<id>`, `/space/create`, `/space/<id>/{join,leave,post}`, `/space/<id>/chat`, `/space/<id>/chat/{send,poll}`
+- DMs: `/messages`, `/messages/new/<user_id>`, `/messages/<convo_id>`, `/messages/<convo_id>/{send,poll}`, `/api/messages/unread-count`
+- Stories: `/stories/create`, `/stories/<id>`, `/api/stories`
+- Wins: `/wins`, `/wins/create`, `/wins/<id>/react`
+- Deals: `/deals`, `/deals/create`, `/deals/<id>`, `/deals/<id>/interest`
+- Resources: `/resources`, `/resources/create`, `/resources/<id>/upvote`
+- Challenges: `/challenges`, `/challenges/create`, `/challenges/<id>`, `/challenges/<id>/submit`, `/challenges/submission/<id>/vote`
+- Events: `/events`, `/events/<id>`, `/events/create`, `/events/<id>/rsvp`
+- Lessons (Vault): `/learn` (alias), `/lessons`, `/lessons/<course>/<lesson>`, `/lessons/<course>/<lesson>/complete`
+- Welcome checklist: `/welcome`, `/welcome/check/<id>`
+- Goals / Accountability: `/accountability`, `/accountability/pair/<user>`, `/accountability/goals/{create,<id>/checkin,<id>/complete}`
+- Bookmarks: `/bookmarks`, `/bookmark/<post_id>`
+- Bookings: `/book/<user>`, `/book/<user>/create`, `/bookings`, `/bookings/<id>/{confirm,cancel}`
+- Reels: `/reels`, `/reels/create`
+- Wingman (AI): `/wingman`, `/wingman/send`
+- Map: `/map`
+- Boardroom: `/boardroom`
+- Misc: `/badges`, `/spotlights`, `/activity`, `/search`, `/referrals`, `/preferences/digest`
+- Notifications: `/notifications`, `/notifications/read`, `/notifications/mark-read`, `/api/notifications/unread-count`, `/api/notifications/recent`
+- Native (Capacitor): `/api/devices/{register,unregister}`
+- Pricing/Billing: `/pricing`, `/validate-code`, `/create-checkout-session`, `/subscription/success`, `/billing-portal`, `/webhook/stripe`
+- Admin: `/admin`, `/admin/member/<id>`, `/admin/{toggle-admin,toggle-subscription,grant-lifetime,revoke-lifetime,refund-last,comp-month}/<id>`
+
+**No duplicate routes detected.** Two near-duplicates that are intentional: `/notifications/read` and `/notifications/mark-read` (both POST, both mark-all-read; the second is a leftover; safe to leave but flag for cleanup). The `/learn` route is a 302 redirect alias to `phase3.lessons`.
+
+**Stub / partial routes flagged:**
+- `/wingman/send` (`features_routes.py:894`) returns a placeholder reply if `ANTHROPIC_API_KEY` is missing or contains "placeholder"/"replace" — works, but unconfigured in local env. Acceptable for MVP.
+- `/create-checkout-session` (`app.py:1237`) returns a 400 with "Payment is not configured yet. Use a founder code to join." if `STRIPE_SECRET_KEY` looks placeholder. Defaults to founder-code path.
 
 ---
 
 ## 5. Environment Variables
 
-### Currently expected by `app.py`
-- `SECRET_KEY` (Flask session secret)
-- `DATABASE_URL` (Postgres on Railway, sqlite fallback in dev)
-- `STRIPE_SECRET_KEY`
-- `STRIPE_PUBLISHABLE_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_ID` (the subscription price)
-- `GHL_API_KEY`
-- `GHL_LOCATION_ID`
+### Currently expected by code (verified by Phase 0 audit, grep across all py files)
 
-### Phase 0 verifies
-Run `railway variables` on this project's service to list what is actually set.
+| Var | File:line | Default | Required in prod |
+|-----|-----------|---------|------------------|
+| `FLASK_ENV` | `app.py:40` | `development` | Yes (set to `production`) |
+| `SECRET_KEY` | `app.py:41` | none — raises in prod | **Yes — hard requirement** |
+| `DATABASE_URL` | `app.py:49` | `sqlite:///abmc.db` | **Yes** (Railway Postgres) |
+| `STRIPE_SECRET_KEY` | `app.py:82` | `sk_test_placeholder` | **Yes** (live or test) |
+| `STRIPE_PUBLISHABLE_KEY` | `app.py:83` | `pk_test_placeholder` | **Yes** |
+| `STRIPE_WEBHOOK_SECRET` | `app.py:84` | `whsec_placeholder` | **Yes** |
+| `STRIPE_PRICE_ID` | `app.py:85` | `price_placeholder` | **Yes** |
+| `GHL_API_KEY` | `app.py:89` | empty (skip GHL) | Yes (no-op silently if unset) |
+| `GHL_LOCATION_ID` | `app.py:90` | empty | Yes (paired with above) |
+| `ADMIN_EMAILS` | `app.py:180` | empty (skipped) | Optional (defense-in-depth allowlist) |
+| `FOUNDER_CODES` / `FOUNDER_CODE` | `app.py:1231` | `ABMC2026` | Optional (founder bypass codes) |
+| `WINGMAN_DAILY_MESSAGE_CAP` | `features_routes.py:873` | `50` | Optional |
+| `ANTHROPIC_API_KEY` | `features_routes.py:912` | empty (placeholder mode) | Optional (AI Wingman) |
+| `ANTHROPIC_MODEL` | `features_routes.py:919` | `claude-sonnet-4-6` | Optional |
+| `RESEND_API_KEY` | `email_send.py:33` | empty (console stub) | **Yes** (transactional email) |
+| `EMAIL_FROM` | `email_send.py:21` | `onboarding@resend.dev` | **Yes** (custom sender domain) |
+| `EMAIL_FROM_NAME` | `email_send.py:22` | `Sovereign Society` | Optional |
+| `PORT` | `app.py:1709` (post-fix) | `5000` | Optional (Railway sets it) |
+
+### Phase 0 verification (2026-05-02)
+- **Local shell**: ALL of the above are UNSET in this dev environment. `python app.py` runs with the dev SECRET_KEY warning + sqlite + placeholder Stripe + empty GHL. Acceptable for local; nothing to leak.
+- **Railway dashboard**: Railway CLI is installed but not linked from this machine (`railway variables` → "No linked project found"). Manual verification via Railway dashboard required to confirm production env. Phase 1 should run `railway link` once and document.
 
 ### Likely needed in later phases
 - `GHL_MEMBER_PIPELINE_ID`
@@ -98,17 +140,41 @@ Run `railway variables` on this project's service to list what is actually set.
 
 ## 6. GHL Integration — Current State
 
-**There is already a `ghl_upsert_contact()` function in `app.py` (line ~111).** It POSTs to GHL with email, name, tags, phone. It is called at minimum on Founder signup with tags `["Founder", "ABMC"]` (line ~558).
+**There is already a `ghl_upsert_contact()` function in `app.py:227`.** Phase 0 audit verified the actual current state below; some prior assumptions in this section were stale and are corrected.
 
-This means partial integration EXISTS. Phase 1 audits it.
+### `ghl_upsert_contact()` shape (verified 2026-05-02, `app.py:227-258`)
 
-### What's likely missing
-- Stripe webhook handler does not push to GHL (verify in Phase 2)
-- Engagement events (post created, course completed, win posted) do not tag GHL
-- Cancellation does not flag GHL for win-back
-- No workflow triggers connected to specific tags
-- No pipelines defined yet for member lifecycle stages
-- API client is inline in `app.py` — should be lifted to `lib/ghl.py` for reuse
+POSTs to `https://services.leadconnectorhq.com/contacts/upsert` with header `Version: 2021-07-28`. Payload JSON:
+```json
+{
+  "email": "<lower>",
+  "name": "<display name>",
+  "locationId": "<GHL_LOCATION_ID>",
+  "tags": ["<list>"],         // optional
+  "phone": "<E.164>"          // optional
+}
+```
+Runs in a daemon thread, fail-silent (swallows all exceptions). Skips entirely if `GHL_API_KEY` or `GHL_LOCATION_ID` is unset.
+
+### Call sites + tags currently applied (verified 2026-05-02)
+
+| File:line | Trigger | Tags |
+|-----------|---------|------|
+| `app.py:799` | `/signup` POST (free signup, no card) | `["ABMC"]` |
+| `app.py:1348` | `/subscription/success` POST after Stripe checkout (creates account) | `["Paid Member", "Sovereign Society"]` |
+| `app.py:1435` | `customer.subscription.deleted` webhook (`_handle_subscription_deleted`) | `["Churned", "ABMC"]` |
+| `app.py:1499` | `invoice.payment_succeeded` webhook → referrer hits 3 qualified referrals → `_handle_payment_succeeded` lifetime branch | `["Lifetime", "ABMC"]` |
+
+### What IS missing (confirmed 2026-05-02)
+
+- ~~Stripe webhook handler does not push to GHL~~ — **CORRECTION:** webhook DOES push to GHL today on subscription cancel (Churned tag) and on lifetime unlock (Lifetime tag). It does NOT push on `checkout.session.completed`, `customer.subscription.updated`, `invoice.payment_succeeded` (non-lifetime branch), or `invoice.payment_failed`. Phase 2 widens this coverage.
+- Tag taxonomy is inconsistent: `"ABMC"` is the legacy brand, `"Sovereign Society"` is the new one. Phase 1 should standardize on one tag and migrate. Also `"Founder"` (mentioned earlier in this doc) is NOT applied anywhere in current code — that path was removed.
+- Engagement events (post created, course completed, win posted, event RSVP) do not tag GHL.
+- Trial-cancelled is not distinguished from paid-cancelled in tagging — both currently land on `"Churned"`. The locked journey (§7) needs `trial-cancelled` vs `cancelled` separation.
+- No workflow triggers connected to specific tags (lives entirely in GHL UI, not in code).
+- No pipelines defined yet for member lifecycle stages.
+- No custom fields synced (e.g. `payments_made_count`, `qualified_referrals_count`, `lifetime_access`) — all referrer/lifetime state is invisible to GHL workflows today.
+- API client is inline in `app.py` — should be lifted to `lib/ghl.py` for reuse + testability.
 
 ---
 
@@ -133,7 +199,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 — Current state audit | ⬜ pending | Verify routes, envs, GHL existing wiring, Stripe state, deploy state. Includes 2 trivial bug fixes (port 5000 hardcode, `has_active_subscription` trial). Prompt at `phase-prompts/phase-0-audit.md` — runs in parallel with 0B |
+| 0 — Current state audit | ✅ done | Routes, env vars, Stripe wiring, GHL wiring, deploy/email/DB state documented in §13. Two 1-line bug fixes shipped in commit `1116d92` (port 5000 hardcode → `PORT` env; `has_active_subscription` accepts `"trialing"`). Audit report committed separately. Surfaced new launch-blockers: production currently 404s, `cron.py` digest references nonexistent fields, brand-tag inconsistency in GHL calls. |
 | 0A — Public copy + Terms alignment with locked business model | ✅ done | Rewrite landing.html FAQ #2/#5/#6, fix pricing.html ($100 → $99, add trial + lifetime mechanic), rewrite legal.html Terms §2 with proper subscription disclosure. Prompt at `phase-prompts/phase-0a-copy-terms-alignment.md` — completed 2026-05-02, commit e4aa7fc |
 | 0B — Seed empty community with placeholder content + imagery | ✅ done | 8 Founding-Voice users, 16 posts (2 per canonical Space), 4 wins, 4 deals, 7 resources (+14 upvotes), 1 active challenge (+3 submissions), 14 RSVPs across the 3 canonical events. 13 Nano Banana images + 8 SVG monogram avatars. Legacy 6 Spaces + 5 Events purged. Idempotent re-run + `--delete` flag. Completed 2026-05-02, commit 78f8f47. `_seed_content()` idempotency was already correct — no `app.py` change needed. |
 | 1 — Lift GHL into proper client + tighten existing integration | ⬜ pending | Move inline `ghl_upsert_contact` to `lib/ghl.py`, add helpers, add custom fields + tag taxonomy, define pipelines |
@@ -156,6 +222,7 @@ This means partial integration EXISTS. Phase 1 audits it.
 - **2026-05-02 — Day-1 launch-blocker feature set locked (TENTATIVE).** Per Kashi: "fix later" delegation. **Must-work-end-to-end (any bug = launch blocker):** signup → Stripe trial → paywall access flow (incl. `has_active_subscription` fix); feed post/comment/like; DMs; Spaces (join/post/chat — 6 already seeded); profile editing; Stripe billing portal + cancellation; Member Map (distinctive, sells the brand); Events / Mastermind Calls RSVP (1–2 seeded events at launch); notifications; referral system (it IS the business model); pricing + Terms pages (Phase 0A). **Must-work-but-launch-empty (organic content fills):** Deal Board, Resource Vault, Wins Wall, Accountability goals. **Nice-to-have-skippable-at-launch:** Stories, Reels, Weekly Challenges, AI Wingman, Badges (compute lazily), Activity feed, full-text search. Phase 0 audit confirms which of these actually work end-to-end vs which need fixes. Phase prompts for individual fixes will reference this list.
 - **2026-05-02 — Phase 0B v1 → v2 revision. Canonical Spaces locked at 8, canonical Events at 3.** Phase 0B v1 prompt assumed CLAUDE.md's documented 6 Spaces. v1 executor stop-and-reported because the live DB actually has 14 Spaces (legacy 6 from a pre-rebrand seed run + new 8 from the current `_seed_content()` in `app.py:281-309`) and 8 Events (legacy 5 + current 3). Per Kashi: kill the legacy 6 Spaces and legacy 5 Events; canonical set is **the 8 sovereign-pilled Spaces** (Sovereign Wealth, Body & Iron, Awake Minds, Brotherhood Ops, The Arsenal, Red Pill Intel, Family & Legacy, Off Grid) and **the 3 sovereign-voiced Events** (Fire to Fire, Sovereign Wealth Workshop, Brotherhood Summit). Side effect: pre-existing `cover_image` path bug on the legacy 6 (`templates/spaces.html:16` resolved bare filenames against `/static/` while files lived in `/static/uploads/`) auto-resolves when legacy is deleted and new banners use full relative paths (`img/seed/space-<slug>.png`). v2 prompt at `phase-prompts/phase-0b-content-seeding.md` overwrites v1; git history preserves v1. v2 also includes a one-line `_seed_content()` idempotency-guard verification + fix (only if needed) so the DB doesn't grow on each boot, and updates `CLAUDE.md` Community Spaces + Recurring Events sections to reflect the canonical set.
 - **2026-05-02 — Phase 0B complete (commit 78f8f47).** Community seeded, legacy purged. **Migrations:** legacy 6 Spaces (The Vault / Business Strategy Room / Networking Lounge / Investment Club / Wellness & Health / Creator's Corner) deleted; legacy 5 Events (Weekly Mastermind Call / Monthly Networking Mixer / Guest Speaker: AI Automation / Deal Flow Friday / Wellness Workshop: Peptide Protocols) deleted; 6 orphan PNG files in `static/uploads/` removed. Live DB went from 14→8 Spaces and 8→3 Events. **Seeded:** 8 placeholder users (Marcus W., James R., Sean T., Brendan M., Kyle H., Anders L., Chase W., David K.) at `seed.<slug>@sovereign.placeholder` with shared dev password `ChangeBeforeLaunch_2026!`; tier mix is 1 Platinum / 3 Gold / 3 Silver / 1 Bronze; cities span US for Member Map distribution. 16 posts (2 per canonical Space), 4 wins (Win cover wired), 4 deals (Deal cover wired, mix of investment/partnership/service/hiring), 7 resources (with 14 upvotes), 1 active "7-Day Cold Plunge Discipline" challenge (+3 submissions), 14 RSVPs across the 3 canonical events. **Imagery:** 13 abstract gold-on-black PNGs via Nano Banana (8 Space banners + 3 Event covers @ 16:9 1K, 2 generic content covers @ 1:1 1K) saved to `static/img/seed/`; 8 SVG monogram avatars (gold initials on black) generated locally. All `cover_image` fields use full relative paths (`img/seed/space-<slug>.png`) so `url_for('static', ...)` resolves correctly — also implicitly resolves the legacy `templates/spaces.html:16` path bug. **`_seed_content()` idempotency:** verified correct as-is at `app.py:281-396` (existence-checks via `Space.query.filter_by(name=...).first()`, same for Events and Posts) — no fix needed, `app.py` not touched. **CLAUDE.md** Community Spaces + Recurring Events sections updated to canonical 8/3. **Hygiene:** `seed_placeholders.py` is fully idempotent (re-run is no-op) and supports `--delete` flag that wipes all `seed.*` users (cascade), the active challenge, and every image in `static/img/seed/`. Smoke test on local Flask (port 5000 — Control Center wasn't actually holding it tonight; PORT=5050 ignored by `app.py:1709` hardcode, see §10 risk): `/feed`, `/spaces`, `/wins`, `/deals`, `/events`, `/members`, `/resources`, `/map`, `/space/<id>` all return 200 when logged in as a placeholder; all 8 canonical Space banners render via `<img>` tag in `/spaces`.
+- **2026-05-02 — Phase 0 audit complete (bug-fix commit `1116d92`; audit-report commit follows immediately).** Two 1-line launch-blocker bugs fixed: `app.py:1709` now reads `port=int(os.environ.get("PORT", 5000))` (Railway sets `PORT`; macOS Control Center holds 5000 locally so the env-var path is needed in dev too); `models.py:120-126` `has_active_subscription` now accepts `"active"` OR `"trialing"` (locked 30-day trial model would have paywalled out every new signup). Discovery surfaced **three new launch blockers** that were not in §10 before — see §10 additions: (1) production at `https://onepercentmensclub.up.railway.app` returns Railway-edge 404 fallback (`x-railway-fallback: true`) on every probed path — service is unbound or paused; nothing is currently serving the app; (2) `cron.py:64,75-77,82` references `Win.content` and `Event.starts_at` neither of which exist on the actual models (Win has `title`+`description`, Event has `date`+`time`) — the weekly digest CLI command will throw `AttributeError` on first run; (3) GHL tags are split between legacy `"ABMC"` and new `"Sovereign Society"` strings across 4 call sites — Phase 1 must standardize before any lifecycle automations are wired. Also a **factual correction to §6**: prior text said "Stripe webhook handler does not push to GHL" — that is no longer true. The webhook DOES push to GHL on subscription cancel (Churned) and on lifetime unlock (Lifetime). It does NOT push on checkout-completed, sub-updated, payment-succeeded (non-lifetime branch), or payment-failed; Phase 2 widens the coverage. Routes inventory locked at 105 (54 in `app.py`, 9 in `phase3_routes.py`, 42 in `features_routes.py`) — full list in §13.1.
 - **2026-05-02 — Phase 0A complete (commit e4aa7fc).** Public copy + Terms reconciled with locked business model. Three files edited: `templates/landing.html` (FAQ #2/#5/#6 rewritten), `templates/pricing.html` ($100→$99, +trial banner under tagline, +lifetime referral note under cancel-anytime), `templates/legal.html` (§2 expanded into Membership & Billing, new §2A Lifetime Access — Referral-Earned). Repo-wide grep for residual stale copy (`99/month for|three months|three payments|3 payments|3 months`) returned clean. Verified live on local Flask (port 5050; macOS Control Center holds 5000) — `/`, `/pricing`, `/terms` all 200; section ordering reads 1, 2, 2A, 3, 4, 5, 6, 7, 8 as specified. **Final FAQ #2 wording (canonical, quote verbatim in future copy):** "$99 / month, ongoing. Your first 30 days are free — you sign up with a card on file but no charge hits until day 31. There is no fixed end to the membership; you can cancel any time. The Society also offers Lifetime Access — but you don't buy it, you earn it. Bring three brothers into the Society. Once each one has completed six paid months ($594 each), your billing ends permanently and your seat is yours for life." **Final Terms §2A wording (canonical, contract-law load-bearing):** "Sovereign Society offers Lifetime Access at no further charge to members who successfully refer at least three (3) other paying members, where each of those three referrals must independently complete six (6) consecutive months of $99 payments — a total of $594 paid by each referral, or $1,782 in total referral-driven revenue, before the referring member qualifies. Once you reach this threshold, your $99 monthly billing will be permanently terminated and your platform access becomes Lifetime, contingent on continued adherence to the Member Code of Conduct (Section 4). The following do NOT count toward referral qualification: trial-period months (no payment was made); refunded payments; charged-back payments; payments made by referrals who later cancelled before reaching six successful payments. If a referral cancels before completing six payments, their progress does not transfer and is not bankable for a future re-signup. There is no other path to Lifetime Access. Statements elsewhere on the website that may have suggested an alternative path are superseded by this Section."
 
 ---
@@ -167,10 +234,10 @@ This means partial integration EXISTS. Phase 1 audits it.
 - **No Celery** — background tasks use threading. Fine for MVP, watch for race conditions
 - **File uploads stored on Railway disk** — Railway disks are ephemeral on deploys; migrate to S3/R2 before launch
 - **Stripe subscription cancellation handling** — needs verification (does the app actually downgrade access on cancel?)
-- **`User.has_active_subscription` rejects `"trialing"` status** ([models.py:120-126](models.py#L120-L126)) — current code only treats `"active"` as active. With the locked 30-day-trial model, every trial user will be paywalled out the moment they sign up. **Launch blocker.** Phase 0 fixes this — change to `self.subscription_status in ("active", "trialing")`.
+- ~~**`User.has_active_subscription` rejects `"trialing"` status** ([models.py:120-126](models.py#L120-L126)) — current code only treats `"active"` as active. With the locked 30-day-trial model, every trial user will be paywalled out the moment they sign up. **Launch blocker.** Phase 0 fixes this — change to `self.subscription_status in ("active", "trialing")`.~~ (resolved 2026-05-02 by phase-0, commit `1116d92`)
 - ~~**Public copy misrepresents the offer.** `templates/landing.html` (FAQ), `templates/pricing.html` ($100 typo + missing trial/lifetime), and `templates/legal.html` (Terms §2) all promise "$99/month for 3 months → lifetime" — a model the code does not implement and which Kashi has confirmed is NOT the actual offer. **Material contract-law exposure if signups happen against this text.** Launch blocker. Phase 0A reconciles all three files.~~ (resolved 2026-05-02 by phase-0a, commit e4aa7fc)
 - **Stale support email `support@onepercentmensclub.com`** in `legal.html` (Terms §8 + Privacy §"Your Rights"). Old brand. Need new support email on `sovereignsociety.com` or another chosen domain — depends on Q7 (email sender domain). Cleanup once domain locked.
-- **Port 5000 hardcoded in `app.py:1709`.** Surfaced 2026-05-02 by Phase 0A executor — macOS Control Center holds port 5000, blocking local dev. Fix: change `app.run(port=5000)` to `app.run(port=int(os.getenv("PORT", 5000)))`. Trivial 1-line fix, fold into Phase 0 audit.
+- ~~**Port 5000 hardcoded in `app.py:1709`.** Surfaced 2026-05-02 by Phase 0A executor — macOS Control Center holds port 5000, blocking local dev. Fix: change `app.run(port=5000)` to `app.run(port=int(os.getenv("PORT", 5000)))`. Trivial 1-line fix, fold into Phase 0 audit.~~ (resolved 2026-05-02 by phase-0, commit `1116d92`)
 - **`legal.html` Terms §4 (Member Code of Conduct) is still placeholder text** ("Members agree to engage respectfully…"). The new §2A invokes it as a contingency for Lifetime Access continuation, so when §2A goes live, §4 needs real, enforceable conduct rules. Phase 7 (Compliance + community guidelines) work.
 - **`legal.html` `Last updated: April 2026` date is stale** (actual content was updated 2026-05-02 by Phase 0A). Needs a refresh, plus a forward decision on whether to track legal-page revision history (changelog at top of file, archived versions, etc.). Cleanup before any paid signup.
 - **Multiple Stripe price IDs?** — one tier today (`STRIPE_PRICE_ID`) — might need annual + monthly + founder pricing
@@ -179,6 +246,11 @@ This means partial integration EXISTS. Phase 1 audits it.
 - **Bryce handoff still pending.** Production credentials (Stripe, GHL, Railway, domain, email service API keys, repo admin) are currently held by Bryce. Full transfer / co-ownership checklist drafted at `BRYCE-HANDOFF.md` (to be sent to Bryce). Until every checkbox there is confirmed, Sovereign Society depends on a single non-Kashi human to keep running — durability risk and launch blocker for anything beyond local dev. Critical items for any production launch: Stripe keys (`sk_live_*`, webhook secret, price ID with `trial_period_days=30`), GHL API key + location ID (must be a fresh location, NOT shared with Stratum), Railway admin access, domain registrar + DNS access, email-service API key.
 - **`GEMINI_API_KEY` exposed via chat 2026-05-02.** Phase 0B executor reported that the Gemini key (Nano Banana / Google Generative AI) was pasted directly in conversation chat to invoke the image-generation skill. Once a key appears in chat it is captured in transcripts/logs we don't control — treat as compromised. **Action: rotate this key immediately** (Google AI Studio → API keys → revoke + reissue). New key goes into `.env.local` (gitignored), executor reads from env, never writes the value back to chat. Add to Bryce-handoff scope so the rotated key is centrally tracked. **Pattern enforcement going forward:** no API keys, webhook secrets, Stripe keys, or session secrets are ever pasted in chat. They live in `.env.local`, in Railway/Vercel env config, or in 1Password. Executors that need a key request it via env var only.
 - **Placeholder seed content must be cleaned out OR transparently labeled before any paid launch.** Phase 0B (commit 78f8f47) seeded 8 fictional "Founding Voice" users with bios, posts, wins, deals, resources, RSVPs, and an active weekly challenge. Every placeholder user's bio ends with `— Founding Voice (pre-launch seed account)`, which is honest but visible. Their posts/wins/deals do NOT carry that label — a casual reader of `/feed` would not know they are seed content. **Decision needed before public marketing:** (a) keep the seed content as-is and treat the footer as sufficient disclosure, (b) replace the 8 placeholders with a real founder cohort (Bryce + Kashi's network) before public launch, or (c) run `python seed_placeholders.py --delete` immediately before flipping the marketing switch and operate from an empty community. Cleanup is one command; the choice is content-strategy, not technical. Tracked for Phase 1 of the customer-journey work. Dev login (placeholders only): `seed.<slug>@sovereign.placeholder` / `ChangeBeforeLaunch_2026!`.
+- **Production at `https://onepercentmensclub.up.railway.app` is currently NOT serving the app.** Surfaced 2026-05-02 by Phase 0 audit. `curl -I` against `/`, `/pricing`, `/healthz` all return HTTP 404 with `x-railway-fallback: true` (Railway's edge fallback when no service is bound to the host). Either the Railway service is paused, the domain is unbound, or the most recent deploy crashed and Railway has nothing healthy to serve. **Hard launch blocker for any signups.** Action: log into Railway dashboard, check service health, redeploy if needed. May be tied to the Bryce-handoff item below if Kashi can't access Railway directly.
+- **`cron.py` weekly digest references nonexistent model fields.** Surfaced 2026-05-02 by Phase 0 audit. `cron.py:64` reads `w.content` on a `Win` (Win has `title` + `description`, no `content`); `cron.py:75-77,82` filter/order by `Event.starts_at` (Event has `date` + `time`, no `starts_at`). Running `flask cron digest` will throw `AttributeError` at SQL build time and abort the digest before any emails go out. Bug existed before Phase 0; not in scope for the audit's two-line fix budget. Phase that wires up Railway Cron should also fix these (or Phase 1 if email digest is a launch-day asset). DM-throttled email and challenge announce email do NOT have this bug — they read fields that exist.
+- **GHL tag taxonomy split between legacy `"ABMC"` and new `"Sovereign Society"`.** Surfaced 2026-05-02 by Phase 0 audit. Four call sites apply tags inconsistently: signup uses `["ABMC"]`, paid-signup uses `["Paid Member", "Sovereign Society"]`, churn uses `["Churned", "ABMC"]`, lifetime uses `["Lifetime", "ABMC"]`. Any GHL workflow filtering on either tag will miss half the population. Phase 1 (lift to `lib/ghl.py`) is the right place to standardize on a single canonical tag, document the chosen taxonomy in this file, and add a one-shot backfill script for already-tagged contacts in the live GHL location.
+- **`/notifications/read` and `/notifications/mark-read` are duplicate routes** (both POST, both mark-all-read; `app.py:1151` and `app.py:1185`). Not a bug — just dead weight. Pick one, delete the other, retire the duplicate at the next routine cleanup.
+- **`cron.py:133` admin-email lookup is buggy.** `(User.query.filter_by(is_admin=True).first() or {}).email` — when no admin exists, `or {}` returns a dict and `.email` will raise `AttributeError`. Path is only hit by the `flask cron test-email` smoke test, so not launch-blocking — fold into the same cleanup as the digest field bugs above.
 - **Apparel line in scope but not yet scoped.** Per Kashi 2026-05-02: launch a Sovereign Society apparel line (T-shirts, hats, hoodies, "earned merch" pendant for Lifetime-Qualified members) connected to the membership. **Recommended MVP path:** print-on-demand via Printful or Printify, separate Shopify storefront at `shop.sovereignsociety.com` ($39/mo), 4–5 SKUs to launch (logo crewneck tee, manifesto back-print tee, embroidered cap, hoodie, and small-batch manufactured "earned" pendant). Tier integration: 20% member discount via Stripe coupon, Founding-100 numbered tee for first 100 members, Lifetime-Qualified members receive the pendant free. Total upfront: ~$1k–2k for POD launch; manufactured hero piece comes later when revenue justifies. Estimated 5–20 orders week 1, scale tied to Society membership growth. Decisions still needed: which Stripe account (existing membership Stripe or separate Shopify account), apparel designer (freelance vs Nano Banana for patterns + human for typography), launch timing relative to Society public launch. Phase prompt for apparel-line setup TBD — gated on Society launch first OR can run in parallel if Kashi prioritizes.
 
 ---
@@ -198,3 +270,210 @@ This means partial integration EXISTS. Phase 1 audits it.
 ## 12. Reference: Customer Journey Playbook
 
 This project will get its own community-flavored playbook in Phase 6. Until then, reference the Stratum playbook structure at `~/stratum-therapeutics/CUSTOMER-JOURNEY-PLAYBOOK.md` and the reusable template at `~/claude-code-playbook/template-customer-journey.md` — same methodology, different content.
+
+---
+
+## 13. Phase 0 Audit Report — 2026-05-02
+
+This appendix captures the read-only discovery output from Phase 0. The two trivial bug fixes shipped in commit `1116d92`. This audit ships in its own commit so code-changes and doc-changes have separate blame.
+
+### 13.1 Routes Inventory (complete)
+
+**`app.py` — 54 routes**
+
+| Method | Path | Handler |
+|--------|------|---------|
+| GET | `/` | `index` |
+| POST | `/api/devices/register` | `register_device` |
+| POST | `/api/devices/unregister` | `unregister_device` |
+| GET, POST | `/preferences/digest` | `toggle_digest` |
+| GET | `/terms` | `terms` |
+| GET | `/privacy` | `privacy` |
+| GET | `/onboarding` | `onboarding` |
+| POST | `/onboarding` | `onboarding_submit` |
+| GET | `/feed` | `feed` |
+| POST | `/feed` | `create_post` |
+| POST | `/like/<int:post_id>` | `toggle_like` |
+| POST | `/comment/<int:post_id>` | `add_comment` |
+| DELETE | `/post/<int:post_id>` | `delete_post` |
+| GET, POST | `/login` | `login` |
+| GET, POST | `/signup` | `signup` |
+| GET | `/logout` | `logout` |
+| GET, POST | `/forgot-password` | `forgot_password` |
+| GET, POST | `/reset-password/<token>` | `reset_password` |
+| GET | `/verify-email/<token>` | `verify_email` |
+| POST | `/resend-verification` | `resend_verification` |
+| GET | `/profile/<int:user_id>` | `profile` |
+| GET, POST | `/profile/edit` | `edit_profile` |
+| GET | `/members` | `members` |
+| GET | `/leaderboard` | `leaderboard` |
+| POST | `/follow/<int:user_id>` | `toggle_follow` |
+| GET | `/spaces` | `spaces` |
+| GET | `/space/<int:space_id>` | `space_detail` |
+| GET, POST | `/space/create` | `create_space` |
+| POST | `/space/<int:space_id>/join` | `join_space` |
+| POST | `/space/<int:space_id>/leave` | `leave_space` |
+| POST | `/space/<int:space_id>/post` | `create_space_post` |
+| GET | `/notifications` | `notifications` |
+| POST | `/notifications/read` | `mark_notifications_read` |
+| GET | `/api/notifications/unread-count` | `api_unread_count` |
+| GET | `/api/notifications/recent` | `api_recent_notifications` |
+| POST | `/notifications/mark-read` | `mark_read` *(duplicate of `/notifications/read`)* |
+| POST | `/poll/vote/<int:option_id>` | `vote_poll` |
+| GET | `/pricing` | `pricing` |
+| POST | `/validate-code` | `validate_code` |
+| POST | `/create-checkout-session` | `create_checkout_session` |
+| GET, POST | `/subscription/success` | `subscription_success` |
+| POST | `/webhook/stripe` | `stripe_webhook` *(CSRF-exempt)* |
+| POST | `/billing-portal` | `billing_portal` |
+| GET | `/admin` | `admin_panel` |
+| GET | `/admin/member/<int:user_id>` | `admin_member_detail` |
+| POST | `/admin/toggle-admin/<int:user_id>` | `toggle_admin` |
+| POST | `/admin/toggle-subscription/<int:user_id>` | `toggle_subscription` |
+| POST | `/admin/grant-lifetime/<int:user_id>` | `admin_grant_lifetime` |
+| POST | `/admin/revoke-lifetime/<int:user_id>` | `admin_revoke_lifetime` |
+| POST | `/admin/refund-last/<int:user_id>` | `admin_refund_last` |
+| POST | `/admin/comp-month/<int:user_id>` | `admin_comp_month` |
+| GET | `/learn` | `learn` *(redirect → phase3.lessons)* |
+
+**`phase3_routes.py` — 9 routes (blueprint `phase3`)**
+
+| Method | Path | Handler |
+|--------|------|---------|
+| GET | `/events` | `events` |
+| GET | `/events/<int:event_id>` | `event_detail` |
+| GET, POST | `/events/create` | `create_event` *(admin-only)* |
+| POST | `/events/<int:event_id>/rsvp` | `event_rsvp` |
+| GET | `/lessons` | `lessons` |
+| GET | `/lessons/<int:course_id>/<int:lesson_id>` | `lesson_detail` |
+| POST | `/lessons/<int:course_id>/<int:lesson_id>/complete` | `complete_lesson` |
+| GET | `/welcome` | `welcome` *(checklist)* |
+| POST | `/welcome/check/<int:item_id>` | `check_item` |
+
+**`features_routes.py` — 42 routes (blueprint `features`)**
+
+| Method | Path | Handler |
+|--------|------|---------|
+| GET | `/messages` | `inbox` |
+| GET | `/messages/new/<int:user_id>` | `new_conversation` |
+| GET | `/messages/<int:convo_id>` | `chat` |
+| POST | `/messages/<int:convo_id>/send` | `send_message` |
+| GET | `/messages/<int:convo_id>/poll` | `poll_messages` |
+| GET | `/api/messages/unread-count` | `api_unread_messages` |
+| POST | `/stories/create` | `create_story` |
+| GET | `/stories/<int:story_id>` | `view_story` |
+| GET | `/api/stories` | `api_stories` |
+| GET | `/wins` | `wins` |
+| POST | `/wins/create` | `create_win` |
+| POST | `/wins/<int:win_id>/react` | `react_win` |
+| GET | `/deals` | `deals` |
+| GET, POST | `/deals/create` | `create_deal` |
+| GET | `/deals/<int:deal_id>` | `deal_detail` |
+| POST | `/deals/<int:deal_id>/interest` | `deal_interest` |
+| GET | `/challenges` | `challenges` |
+| GET, POST | `/challenges/create` | `create_challenge` *(admin-only)* |
+| GET | `/challenges/<int:ch_id>` | `challenge_detail` |
+| POST | `/challenges/<int:ch_id>/submit` | `submit_challenge` |
+| POST | `/challenges/submission/<int:sub_id>/vote` | `vote_submission` |
+| GET | `/resources` | `resources` |
+| GET, POST | `/resources/create` | `create_resource` |
+| POST | `/resources/<int:res_id>/upvote` | `upvote_resource` |
+| GET | `/referrals` | `referrals` |
+| GET | `/r/<code>` | `referral_landing` *(public)* |
+| GET | `/accountability` | `accountability` |
+| POST | `/accountability/pair/<int:user_id>` | `create_pair` |
+| POST | `/accountability/goals/create` | `create_goal` |
+| POST | `/accountability/goals/<int:goal_id>/checkin` | `goal_checkin` |
+| POST | `/accountability/goals/<int:goal_id>/complete` | `complete_goal` |
+| GET | `/bookmarks` | `bookmarks` |
+| POST | `/bookmark/<int:post_id>` | `toggle_bookmark` |
+| GET | `/badges` | `badges_page` |
+| GET | `/reels` | `reels` |
+| GET, POST | `/reels/create` | `create_reel` |
+| GET | `/space/<int:space_id>/chat` | `space_chat` |
+| POST | `/space/<int:space_id>/chat/send` | `send_space_chat` |
+| GET | `/space/<int:space_id>/chat/poll` | `poll_space_chat` |
+| GET | `/wingman` | `wingman` |
+| POST | `/wingman/send` | `wingman_send` |
+| GET | `/map` | `member_map` |
+| POST | `/profile/location` | `update_location` |
+| GET | `/book/<int:user_id>` | `booking_page` |
+| POST | `/book/<int:user_id>/create` | `create_booking` |
+| GET | `/bookings` | `my_bookings` |
+| POST | `/bookings/<int:booking_id>/confirm` | `confirm_booking` |
+| POST | `/bookings/<int:booking_id>/cancel` | `cancel_booking` |
+| GET | `/boardroom` | `boardroom` *(Platinum or Level 9+)* |
+| GET | `/spotlights` | `spotlights` |
+| GET | `/activity` | `activity_feed` |
+| GET | `/search` | `search` |
+
+(Counts: app.py 54 + phase3 9 + features 42 = 105 unique route definitions.)
+
+### 13.2 Stripe State
+
+- **Mode (local):** `STRIPE_SECRET_KEY` is UNSET in this dev shell → `app.py:82` falls back to literal `"sk_test_placeholder"`. `app.py:1242` short-circuits checkout when the key is placeholder. Cannot determine production mode without Railway dashboard access.
+- **`STRIPE_PRICE_ID`:** UNSET locally; default `"price_placeholder"`. Validity in production needs manual verification by Kashi (Stripe CLI not installed locally; no `stripe prices retrieve` available).
+- **Webhook route:** `POST /webhook/stripe` (`app.py:1361`), CSRF-exempt, signature-verified via `stripe.Webhook.construct_event` against `STRIPE_WEBHOOK_SECRET`. Idempotent via `StripeEvent` table on `stripe_event_id`.
+- **Webhook events handled:**
+  - `checkout.session.completed` → `_handle_checkout_completed` (backfills `stripe_customer_id` if user already exists by email)
+  - `customer.subscription.updated` → `_handle_subscription_updated` (refreshes `subscription_status` + `current_period_end`; skips if user is `lifetime_access`)
+  - `customer.subscription.deleted` → `_handle_subscription_deleted` (sets status `canceled`, **calls `ghl_upsert_contact(...tags=["Churned", "ABMC"])`**)
+  - `invoice.payment_succeeded` → `_handle_payment_succeeded` (increments `payments_made_count`; at 6, increments referrer's `qualified_referrals_count`; at 3, flips referrer to `lifetime_access=True`, cancels referrer's Stripe sub, calls `ghl_upsert_contact(...tags=["Lifetime", "ABMC"])` and `send_lifetime_unlocked` email)
+  - `invoice.payment_failed` → `_handle_payment_failed` (sets status `past_due`, sends `send_payment_failed` email)
+- **Webhook → GHL:** YES on `subscription.deleted` (Churned tag) and `payment_succeeded → lifetime branch` (Lifetime tag). NO on the other 3 events. (Phase 2 widens this.)
+
+### 13.3 GHL State
+
+- `ghl_upsert_contact()` shape and call sites: see updated §6.
+- `GHL_API_KEY`: UNSET locally. `GHL_LOCATION_ID`: UNSET locally.
+- No live ping attempted (env unset → no auth).
+
+### 13.4 Deploy State
+
+- **Builder:** Railway with NIXPACKS (`railway.json`), Python provider (`nixpacks.toml`).
+- **Procfile:** `web: gunicorn app:app -w 4 --threads 2 --worker-class gthread --timeout 60`.
+- **Start command (production):** `flask db upgrade && gunicorn app:app -w 4 --threads 2 --worker-class gthread --timeout 60` (from `railway.json`). Migrations run automatically before gunicorn starts. Restart policy: `ON_FAILURE` × 10.
+- **Live URL:** `https://onepercentmensclub.up.railway.app` (declared in `capacitor.config.json:7`). `curl -I` returns HTTP 404 with `x-railway-fallback: true` on `/`, `/pricing`, `/healthz` → **production is currently down or service is unbound**. See §10.
+- **Last code deploy:** Most recent commit on `origin/main` is `02d87f1` (sot: log gemini api key exposure + rotation pattern). Railway auto-deploys from main, so it should have run, but the live URL is not serving — disconnect between repo and runtime.
+- **Migrations:** 7 alembic revisions in `migrations/versions/`:
+  1. `43be3a8d6b40_initial_schema_baseline`
+  2. `88a0045f8905_auth_hardening_lifetime_access_fields`
+  3. `9c1f2a3e4d5b_stripe_event_idempotency_log`
+  4. `abcd1234e5f6_engagement_email_throttling`
+  5. `c2d3e4f5a6b7_perf_indexes` (23 hot-path indexes)
+  6. `d3e4f5a6b7c8_device_tokens`
+  7. `e4f5a6b7c8d9_referral_qualification_fields`
+- **`_seed_content()` trigger:** `app.py:399-405` runs at module import time inside `with app.app_context()`, wrapped in try/except. Gunicorn forks 4 workers; this will run 4 times, but `_seed_content()` is idempotent (existence checks before insert). Side effect: brief startup log noise. Fine for MVP.
+- **`seed_checklist()` and `seed_badges()`** also run at startup (`app.py:271-278`) — also idempotent.
+
+### 13.5 Email Infrastructure
+
+- **Service:** Resend (`resend==2.0.0` in `requirements.txt`; `email_send.py:18-29`).
+- **Sender:** `EMAIL_FROM` defaults to `onboarding@resend.dev` (Resend's shared sandbox domain — works for testing but will land in spam at scale and signals "not a real product"). `EMAIL_FROM_NAME` defaults to `Sovereign Society`.
+- **Production sender domain (TBD):** No custom sender domain configured today. Needs DKIM/SPF/DMARC at the registrar of whatever domain Sovereign Society lands on — likely `sovereignsociety.com` per Phase 0A intent. Also tied to the stale `support@onepercentmensclub.com` cleanup in §10.
+- **Fallback:** when `RESEND_API_KEY` is unset, `_send_now` prints to stdout (console stub) — dev-friendly, won't crash.
+- **Templates (`templates/emails/`):** `_layout.html`, `welcome_verify`, `password_reset`, `payment_succeeded`, `payment_failed`, `referral_qualified`, `lifetime_unlocked`, `weekly_digest` — each with `.html` + `.txt` pair (15 files total + 1 layout).
+- **Typed senders (`email_send.py`):** `send_welcome_verify`, `send_password_reset`, `send_payment_succeeded`, `send_referral_progress`, `send_payment_failed`, `send_lifetime_unlocked`, `send_weekly_digest`, plus the generic `send_email`.
+- **Engagement throttling (`cron.py`):** `notify_dm_throttled` enforces 1 DM-email per recipient per hour via `User.last_engagement_email_at`. Weekly digest enforces 6-day idempotency via `User.last_digest_sent_at`. Both honor `email_digest_opt_out`. Unsubscribe link → `/preferences/digest`.
+
+### 13.6 Database State
+
+- **`DATABASE_URL`:** UNSET locally → `app.py:49` falls back to `sqlite:///abmc.db`. `app.py:50-51` rewrites `postgres://` → `postgresql://` (Railway gives the bare prefix; SQLAlchemy 1.4+ wants the explicit driver).
+- **Local instance dir:** `/instance/` does not exist on this machine — fresh checkout, no SQLite has been created here. Not a problem (will create on first `python app.py` run).
+- **Engine pool config (Postgres only):** `pool_pre_ping=True`, `pool_size=5`, `max_overflow=10`, `pool_recycle=1800` — sane defaults for Railway's connection limits.
+- **Migration count:** 7 (see §13.4).
+- **Indexes:** the `c2d3e4f5a6b7_perf_indexes` migration creates 23 indexes covering hot read paths: post (user_id, space_id, created_at), comment (post_id), like (post_id, user_id), notification (user_id, is_read), conversation (user1, user2), message (conversation_id, is_read), win (created_at), space_membership (user_id, space_id), user (subscription_status, lifetime_access), ai_chat (user_id, created_at), activity (user_id), bookmark (user_id), follow (follower_id, followed_id). Also explicit indexes on `User.email_verify_token` and `User.password_reset_token` (in the model definition).
+- **Indexes worth flagging for production load (not changing now):** no index on `User.email` (it's the `unique=True` column so it gets one implicitly — fine), no index on `User.referred_by` (referral lookups will table-scan once `User.count()` grows past a few thousand — Phase 1 should add).
+
+### 13.7 Other surprises / launch-blocker candidates
+
+- **Production is currently 404.** Already in §10 — repeated here because it surfaced during this audit and is the single most important thing to resolve before any Phase 1 work. Until the Railway service is bound + healthy, every other phase is blocked from production verification.
+- **`cron.py:64,75-77,82` field bugs.** Already in §10. Weekly digest will crash on first run.
+- **`cron.py:133` admin-email lookup bug.** Already in §10. Test-email CLI will crash if no admin user exists.
+- **GHL tag taxonomy split.** Already in §10. Workflows that filter on `"ABMC"` will miss paid signups; workflows filtering on `"Sovereign Society"` will miss everything else.
+- **`/notifications/read` and `/notifications/mark-read` duplicate routes.** Already in §10.
+- **Capacitor bundle ID + server URL still legacy.** `appId: com.onepercentmensclub.app`, `server.url: https://onepercentmensclub.up.railway.app`, `ios.scheme: OnePercentMC`. Per CLAUDE.md these are infrastructure-tied and intentionally NOT renamed (Apple/Google review process pain). Document only — no action.
+- **PWA manifest is minimal but valid.** `static/manifest.json` declares Sovereign Society branding, dark theme color, two icon sizes. Acceptable for v1.
+- **No TODO/FIXME/XXX markers** anywhere in `app.py`, `phase3_routes.py`, `features_routes.py`, `email_send.py`, `models.py`, or `cron.py`. Either the codebase is genuinely clean of inline cruft, or such markers were never used as a convention.
+- **No `lib/` directory yet.** GHL client lifting (Phase 1 scope) will create it.
+- **No tests currently run as part of the deploy.** `pytest` and `pytest-flask` are in `requirements.txt` but no `tests/` directory exists, no CI workflow file (`.github/workflows/`) was found in the read-mandated paths. Deploy validation is purely manual today. Acceptable for MVP, but flag once paid signups happen.
