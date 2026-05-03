@@ -16,8 +16,12 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('assessment_complete', sa.Boolean(), nullable=False, server_default=sa.false()))
+    # Direct op.add_column avoids batch_alter_table's reflection step on the
+    # user table, which trips a CircularDependencyError in this alembic /
+    # sqlalchemy version when sorting columns near the recently-stacked
+    # last_engagement_email_at / last_digest_sent_at additions. Postgres and
+    # SQLite both support ADD COLUMN with NOT NULL + server_default natively.
+    op.add_column('user', sa.Column('assessment_complete', sa.Boolean(), nullable=False, server_default=sa.false()))
 
     op.create_table(
         'assessment_response',
@@ -34,5 +38,4 @@ def upgrade():
 def downgrade():
     op.drop_index('ix_assessment_response_user_id', table_name='assessment_response')
     op.drop_table('assessment_response')
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.drop_column('assessment_complete')
+    op.drop_column('user', 'assessment_complete')

@@ -21,13 +21,18 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.add_column(sa.Column(
-            'location_visibility',
-            sa.String(length=20),
-            nullable=False,
-            server_default='city_only',
-        ))
+    # Direct op.add_column avoids batch_alter_table reflection on the user
+    # table, which trips a CircularDependencyError in this alembic /
+    # sqlalchemy version when sorting columns near the recently-stacked
+    # last_engagement_email_at / last_digest_sent_at / assessment_complete
+    # additions. Postgres and SQLite both support ADD COLUMN with NOT NULL +
+    # server_default natively.
+    op.add_column('user', sa.Column(
+        'location_visibility',
+        sa.String(length=20),
+        nullable=False,
+        server_default='city_only',
+    ))
     # Legacy users with show_on_map=False become 'hidden'. Postgres rejects
     # boolean-vs-int comparisons; use the boolean form which sqlite also accepts.
     op.execute(
@@ -36,5 +41,4 @@ def upgrade():
 
 
 def downgrade():
-    with op.batch_alter_table('user', schema=None) as batch_op:
-        batch_op.drop_column('location_visibility')
+    op.drop_column('user', 'location_visibility')
