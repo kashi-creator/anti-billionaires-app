@@ -534,6 +534,7 @@ class LessonProgress(db.Model):
 
 class ChecklistItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(60), unique=True, nullable=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, default="")
     link = db.Column(db.String(300), default="")

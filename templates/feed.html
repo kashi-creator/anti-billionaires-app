@@ -218,7 +218,7 @@
         <div class="progress-bar-track" style="margin-bottom:0.75rem">
             <div class="progress-bar-fill" style="width: {{ checklist_pct }}%"></div>
         </div>
-        {% for entry in checklist %}
+        {% for entry in sidebar_checklist %}
         <div class="sidebar-check-item {% if entry.completed %}done{% endif %}">
             {% if entry.completed %}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#D4AF37" stroke="#D4AF37" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -232,7 +232,7 @@
             {% endif %}
         </div>
         {% endfor %}
-        <a href="{{ url_for('phase3.welcome') }}" class="btn btn-ghost btn-xs" style="margin-top:0.5rem;width:100%">View full checklist</a>
+        <a href="{{ url_for('phase3.welcome') }}" class="btn btn-ghost btn-xs" style="margin-top:0.5rem;width:100%">{% if sidebar_overflow %}See all {{ checklist_total }} steps{% else %}View full checklist{% endif %}</a>
     </div>
 </div>
 {% endif %}
@@ -332,6 +332,16 @@ function toggleBookmark(postId, btn) {
             }
         });
 }
+
+{% if focus_composer %}
+// Auto-focus the post composer when arriving from /feed?focus=composer
+(function() {
+    const ta = document.getElementById('postContent');
+    if (!ta) return;
+    ta.focus();
+    try { ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+})();
+{% endif %}
 
 // Load stories
 function loadStories() {
