@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Post a Project{% endblock %}
+
+{% block content %}
+<style>
+  .project-form-page { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem; }
+  .project-form-page h1 { font-family: 'Cormorant Garamond', serif; color: #fff; font-size: 2rem; margin: 0 0 0.5rem 0; }
+  .project-form-page .subtitle { color: #888; font-size: 14px; margin: 0 0 1.5rem 0; line-height: 1.5; }
+
+  .project-form { background: #0e0e0e; border: 1px solid #1f1f1f; border-radius: 6px; padding: 1.5rem; }
+  .project-form .pf-row { margin-bottom: 1.1rem; }
+  .project-form label { display: block; color: #ddd; font-size: 13px; margin-bottom: 6px; font-weight: 500; }
+  .project-form .pf-hint { display: block; color: #777; font-size: 11px; margin-top: 4px; line-height: 1.4; }
+  .project-form input[type="text"],
+  .project-form input[type="file"],
+  .project-form select,
+  .project-form textarea {
+    width: 100%; box-sizing: border-box;
+    background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #fff; padding: 10px 12px; font-size: 14px;
+    font-family: inherit;
+  }
+  .project-form input:focus,
+  .project-form select:focus,
+  .project-form textarea:focus { outline: none; border-color: #D4AF37; }
+  .project-form textarea { min-height: 110px; resize: vertical; }
+
+  .project-form .pf-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+  .project-form .pf-actions .btn { flex: 1; }
+</style>
+
+<div class="project-form-page">
+  <h1>Post a Project</h1>
+  <p class="subtitle">Share what you're building. Other brothers can express interest, follow your progress, and reach out directly.</p>
+
+  <form method="POST" enctype="multipart/form-data" class="project-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="pf-row">
+      <label>Title <span style="color:#D4AF37">*</span></label>
+      <input type="text" name="title" required maxlength="200" placeholder="What are you building?">
+    </div>
+
+    <div class="pf-row">
+      <label>One-liner summary</label>
+      <input type="text" name="summary" maxlength="500" placeholder="The version that fits on a feed card.">
+      <span class="pf-hint">Shown on the projects feed. Up to 500 characters.</span>
+    </div>
+
+    <div class="pf-row">
+      <label>Full description</label>
+      <textarea name="description" placeholder="Tell the story. What is it, why does it matter, what stage are you at, what does support look like?"></textarea>
+    </div>
+
+    <div class="pf-row" style="display: flex; gap: 1rem;">
+      <div style="flex: 1;">
+        <label>Status</label>
+        <select name="status">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if s == 'building' %}selected{% endif %}>{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex: 1;">
+        <label>Type</label>
+        <select name="project_type">
+          {% for t in types %}
+          <option value="{{ t }}" {% if t == 'business' %}selected{% endif %}>{{ t|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="pf-row">
+      <label>Looking for</label>
+      <input type="text" name="looking_for" maxlength="100" placeholder="e.g. co-founder, capital, customers, beta testers">
+      <span class="pf-hint">Free text. Up to 100 characters.</span>
+    </div>
+
+    <div class="pf-row">
+      <label>Cover image</label>
+      <input type="file" name="cover_image" accept="image/*">
+    </div>
+
+    <div class="pf-row">
+      <label>Visibility</label>
+      <select name="visibility">
+        <option value="members_only" selected>Members only — any active member can see this</option>
+        {% if can_brotherhood %}
+        <option value="brotherhood_only">Brotherhood only — Lifetime members only</option>
+        {% endif %}
+      </select>
+      <span class="pf-hint">{% if not can_brotherhood %}Brotherhood-only visibility is reserved for Lifetime members.{% endif %}</span>
+    </div>
+
+    <div class="pf-actions">
+      <a href="{{ url_for('features.projects') }}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-gold">Post Project</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

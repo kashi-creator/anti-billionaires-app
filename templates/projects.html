@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+
+{% block content %}
+<style>
+  .projects-page { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem; }
+  .projects-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
+  .projects-header h1 { margin: 0; font-family: 'Cormorant Garamond', serif; color: #fff; font-size: 2.2rem; letter-spacing: 0.02em; }
+  .projects-header .subtitle { color: #888; font-size: 13px; margin-top: 0.25rem; }
+
+  .projects-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
+  .projects-filters .filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .projects-filters .filter-label { color: #777; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 4px; }
+  .projects-filters a {
+    padding: 6px 12px; border-radius: 4px; background: #0a0a0a; border: 1px solid #2a2a2a;
+    color: #bbb; font-size: 12px; text-decoration: none; transition: all 0.15s;
+  }
+  .projects-filters a:hover { border-color: #D4AF37; color: #fff; }
+  .projects-filters a.active { background: rgba(212,175,55,0.12); border-color: #D4AF37; color: #D4AF37; }
+
+  .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem; }
+
+  .project-card {
+    display: flex; flex-direction: column;
+    background: #0e0e0e; border: 1px solid #1f1f1f; border-radius: 6px;
+    overflow: hidden; text-decoration: none;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .project-card:hover { border-color: #3a2f10; transform: translateY(-2px); }
+
+  .project-cover { height: 160px; background: linear-gradient(135deg, #18140a 0%, #0a0a0a 100%); position: relative; display: flex; align-items: center; justify-content: center; }
+  .project-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .project-cover-fallback { color: rgba(212,175,55,0.18); font-family: 'Cormorant Garamond', serif; font-size: 3rem; font-weight: 600; }
+
+  .project-body { padding: 1rem 1.1rem 1.1rem 1.1rem; flex: 1; display: flex; flex-direction: column; }
+  .project-pills { display: flex; gap: 6px; margin-bottom: 0.5rem; flex-wrap: wrap; }
+  .project-pill {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 3px;
+  }
+  .project-pill-status { background: rgba(212,175,55,0.12); color: #D4AF37; border: 1px solid rgba(212,175,55,0.3); }
+  .project-pill-type { background: #161616; color: #888; border: 1px solid #2a2a2a; }
+  .project-pill-vis { background: #1a1208; color: #b89043; border: 1px solid #3a2510; }
+
+  .project-card h3 { margin: 0.25rem 0 0.5rem 0; color: #fff; font-size: 18px; line-height: 1.3; }
+  .project-summary { color: #888; font-size: 13px; line-height: 1.5; margin: 0 0 0.75rem 0; flex: 1; }
+  .project-looking { color: #D4AF37; font-size: 12px; font-style: italic; margin: 0 0 0.75rem 0; }
+
+  .project-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 0.75rem; border-top: 1px solid #1a1a1a;
+    color: #777; font-size: 12px;
+  }
+  .project-meta strong { color: #ccc; }
+
+  .project-empty { text-align: center; padding: 3rem 1rem; color: #777; }
+  .project-empty h3 { color: #fff; font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; margin: 0.75rem 0 0.5rem 0; }
+  .project-empty p { color: #888; margin: 0 0 1.25rem 0; }
+</style>
+
+<div class="projects-page">
+  <div class="projects-header">
+    <div>
+      <h1>Projects</h1>
+      <div class="subtitle">What the brotherhood is building.</div>
+    </div>
+    <a href="{{ url_for('features.create_project') }}" class="btn btn-gold btn-sm">Post a Project</a>
+  </div>
+
+  <div class="projects-filters">
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <a href="{{ url_for('features.projects', type=selected_type) }}" class="{% if not selected_status %}active{% endif %}">All</a>
+      {% for s in statuses %}
+      <a href="{{ url_for('features.projects', status=s, type=selected_type) }}" class="{% if selected_status == s %}active{% endif %}">{{ s|capitalize }}</a>
+      {% endfor %}
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Type</span>
+      <a href="{{ url_for('features.projects', status=selected_status) }}" class="{% if not selected_type %}active{% endif %}">All</a>
+      {% for t in types %}
+      <a href="{{ url_for('features.projects', status=selected_status, type=t) }}" class="{% if selected_type == t %}active{% endif %}">{{ t|capitalize }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="project-grid">
+    {% for project in projects %}
+    <a href="{{ url_for('features.project_detail', project_id=project.id) }}" class="project-card">
+      <div class="project-cover">
+        {% if project.cover_image %}
+        <img src="{{ url_for('static', filename=project.cover_image) }}" alt="">
+        {% else %}
+        <span class="project-cover-fallback">{{ project.title[0]|upper }}</span>
+        {% endif %}
+      </div>
+      <div class="project-body">
+        <div class="project-pills">
+          <span class="project-pill project-pill-status">{{ project.status|capitalize }}</span>
+          <span class="project-pill project-pill-type">{{ project.project_type|capitalize }}</span>
+          {% if project.visibility == 'brotherhood_only' %}
+          <span class="project-pill project-pill-vis">Brotherhood</span>
+          {% endif %}
+        </div>
+        <h3>{{ project.title }}</h3>
+        {% if project.summary %}
+        <p class="project-summary">{{ project.summary }}</p>
+        {% endif %}
+        {% if project.looking_for %}
+        <p class="project-looking">Looking for: {{ project.looking_for }}</p>
+        {% endif %}
+        <div class="project-meta">
+          <span>By <strong>{{ project.creator.name }}</strong></span>
+          <span>{{ project.interest_count }} interested</span>
+        </div>
+      </div>
+    </a>
+    {% else %}
+    <div class="project-empty" style="grid-column: 1 / -1;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      <h3>No projects yet</h3>
+      <p>Be the first to share what you're building.</p>
+      <a href="{{ url_for('features.create_project') }}" class="btn btn-gold btn-sm">Post a Project</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

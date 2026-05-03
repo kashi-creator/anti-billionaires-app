@@ -1,0 +1,339 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title }}{% endblock %}
+
+{% block content %}
+<style>
+  .pd-page { max-width: 880px; margin: 0 auto; padding: 1.5rem 1rem 4rem 1rem; }
+  .pd-back { color: #888; text-decoration: none; font-size: 13px; display: inline-block; margin-bottom: 1rem; }
+  .pd-back:hover { color: #D4AF37; }
+
+  .pd-archived-banner {
+    background: rgba(180,40,40,0.08); border: 1px solid #3a1010;
+    color: #c97070; padding: 12px 16px; border-radius: 4px;
+    margin-bottom: 1rem; font-size: 13px; line-height: 1.5;
+  }
+
+  .pd-card { background: #0e0e0e; border: 1px solid #1f1f1f; border-radius: 6px; overflow: hidden; }
+
+  .pd-cover { height: 280px; background: linear-gradient(135deg, #18140a 0%, #0a0a0a 100%); display: flex; align-items: center; justify-content: center; }
+  .pd-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .pd-cover-fallback { color: rgba(212,175,55,0.18); font-family: 'Cormorant Garamond', serif; font-size: 6rem; font-weight: 600; }
+
+  .pd-body { padding: 1.5rem; }
+
+  .pd-pills { display: flex; gap: 8px; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .pd-pill { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 10px; border-radius: 3px; }
+  .pd-pill-status { background: rgba(212,175,55,0.12); color: #D4AF37; border: 1px solid rgba(212,175,55,0.3); }
+  .pd-pill-type { background: #161616; color: #888; border: 1px solid #2a2a2a; }
+  .pd-pill-vis { background: #1a1208; color: #b89043; border: 1px solid #3a2510; }
+
+  .pd-title { font-family: 'Cormorant Garamond', serif; color: #fff; font-size: 2.4rem; margin: 0.25rem 0 0.5rem 0; line-height: 1.2; }
+  .pd-summary { color: #ccc; font-size: 16px; line-height: 1.5; margin: 0 0 1rem 0; }
+
+  .pd-creator-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; border-top: 1px solid #1a1a1a; border-bottom: 1px solid #1a1a1a; margin: 1rem 0 1.25rem 0; }
+  .pd-creator-row a { color: #ddd; text-decoration: none; }
+  .pd-creator-row a:hover { color: #D4AF37; }
+  .pd-creator-meta { color: #777; font-size: 12px; margin-left: auto; }
+
+  .pd-description { color: #bbb; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
+  .pd-looking-for {
+    margin-top: 1.25rem; padding: 12px 16px;
+    background: rgba(212,175,55,0.05); border-left: 3px solid #D4AF37; border-radius: 0 4px 4px 0;
+    color: #D4AF37; font-size: 14px; font-style: italic;
+  }
+
+  .pd-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+  .pd-interest-count { color: #888; font-size: 13px; align-self: center; }
+
+  .pd-section { margin-top: 2.5rem; }
+  .pd-section h2 {
+    font-family: 'Cormorant Garamond', serif; color: #fff; font-size: 1.6rem;
+    border-bottom: 1px solid #2a2a2a; padding-bottom: 0.5rem; margin: 0 0 1rem 0;
+  }
+
+  .pd-interest-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pd-interest-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 6px; background: #161616; border: 1px solid #2a2a2a; border-radius: 999px;
+    text-decoration: none; color: #ddd; font-size: 13px;
+  }
+  .pd-interest-chip:hover { border-color: #D4AF37; color: #fff; }
+  .pd-interest-chip .pd-avatar { width: 24px; height: 24px; border-radius: 50%; background: #D4AF37; color: #0a0a0a; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11px; overflow: hidden; }
+  .pd-interest-chip .pd-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .pd-update {
+    background: #0c0c0c; border: 1px solid #1a1a1a; border-radius: 4px;
+    padding: 1rem 1.1rem; margin-bottom: 0.75rem;
+  }
+  .pd-update-meta { color: #777; font-size: 12px; margin-bottom: 0.5rem; }
+  .pd-update-content { color: #ddd; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .pd-update img { max-width: 100%; border-radius: 4px; margin-top: 0.75rem; }
+
+  .pd-update-form {
+    background: #0c0c0c; border: 1px solid #1a1a1a; border-radius: 4px;
+    padding: 1rem; margin-bottom: 1.25rem;
+  }
+  .pd-update-form textarea {
+    width: 100%; box-sizing: border-box; min-height: 80px; resize: vertical;
+    background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #fff; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .pd-update-form textarea:focus { outline: none; border-color: #D4AF37; }
+  .pd-update-form-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+
+  /* Payments — load-bearing disclaimer & directory list */
+  .pd-pay-disclaimer {
+    background: rgba(180,140,40,0.06); border: 1px solid #3a2e10; border-left: 3px solid #b89043;
+    color: #c8a560; padding: 12px 16px; border-radius: 0 4px 4px 0;
+    font-size: 13px; line-height: 1.5; margin-bottom: 1rem;
+  }
+  .pd-pay-disclaimer strong { color: #fff; }
+
+  .pd-pay-list { display: flex; flex-direction: column; gap: 8px; }
+  .pd-pay-row {
+    display: flex; align-items: center; gap: 12px;
+    background: #0c0c0c; border: 1px solid #1f1f1f; border-radius: 4px;
+    padding: 10px 12px;
+  }
+  .pd-pay-icon {
+    width: 32px; height: 32px; border-radius: 4px; flex-shrink: 0;
+    background: rgba(212,175,55,0.12); color: #D4AF37;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px; letter-spacing: 0.05em;
+  }
+  .pd-pay-info { flex: 1; min-width: 0; }
+  .pd-pay-info-label { color: #fff; font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+  .pd-pay-info-addr { color: #888; font-size: 12px; font-family: 'JetBrains Mono', monospace; word-break: break-all; }
+  .pd-pay-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .pd-pay-actions button, .pd-pay-actions a {
+    padding: 6px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    background: #161616; border: 1px solid #2a2a2a; color: #bbb; border-radius: 3px;
+    cursor: pointer; text-decoration: none;
+  }
+  .pd-pay-actions button:hover, .pd-pay-actions a:hover { border-color: #D4AF37; color: #D4AF37; }
+
+  .pd-pay-add {
+    background: #0c0c0c; border: 1px solid #1a1a1a; border-radius: 4px;
+    padding: 1rem; margin-top: 0.75rem;
+  }
+  .pd-pay-add label { display: block; color: #ddd; font-size: 12px; margin-bottom: 4px; }
+  .pd-pay-add select, .pd-pay-add input {
+    width: 100%; box-sizing: border-box;
+    background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #fff; padding: 8px 10px; font-size: 13px; font-family: inherit;
+    margin-bottom: 8px;
+  }
+  .pd-pay-add input:focus, .pd-pay-add select:focus { outline: none; border-color: #D4AF37; }
+  .pd-pay-add button { padding: 8px 14px; font-size: 12px; }
+
+  .pd-empty { color: #777; font-style: italic; font-size: 13px; }
+</style>
+
+<div class="pd-page">
+  <a href="{{ url_for('features.projects') }}" class="pd-back">&larr; Back to Projects</a>
+
+  {% if not project.is_active and is_creator %}
+  <div class="pd-archived-banner">
+    <strong>Archived.</strong> This project is hidden from public feeds. Only you can see it via direct link.
+  </div>
+  {% endif %}
+
+  <div class="pd-card">
+    <div class="pd-cover">
+      {% if project.cover_image %}
+      <img src="{{ url_for('static', filename=project.cover_image) }}" alt="">
+      {% else %}
+      <span class="pd-cover-fallback">{{ project.title[0]|upper }}</span>
+      {% endif %}
+    </div>
+
+    <div class="pd-body">
+      <div class="pd-pills">
+        <span class="pd-pill pd-pill-status">{{ project.status|capitalize }}</span>
+        <span class="pd-pill pd-pill-type">{{ project.project_type|capitalize }}</span>
+        {% if project.visibility == 'brotherhood_only' %}
+        <span class="pd-pill pd-pill-vis">Brotherhood Only</span>
+        {% elif project.visibility == 'private' %}
+        <span class="pd-pill pd-pill-vis">Private</span>
+        {% endif %}
+      </div>
+
+      <h1 class="pd-title">{{ project.title }}</h1>
+      {% if project.summary %}
+      <p class="pd-summary">{{ project.summary }}</p>
+      {% endif %}
+
+      <div class="pd-creator-row">
+        <div class="pd-avatar" style="width:36px;height:36px;border-radius:50%;background:#D4AF37;color:#0a0a0a;display:flex;align-items:center;justify-content:center;font-weight:600;overflow:hidden;">
+          {% if project.creator.profile_photo %}
+          <img src="{{ url_for('static', filename=project.creator.profile_photo) }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+          {% else %}
+          {{ project.creator.name[0]|upper }}
+          {% endif %}
+        </div>
+        <a href="{{ url_for('profile', user_id=project.creator.id) }}"><strong>{{ project.creator.name }}</strong></a>
+        <span class="pd-creator-meta">Updated {{ project.time_ago }}</span>
+      </div>
+
+      {% if project.description %}
+      <div class="pd-description">{{ project.description }}</div>
+      {% endif %}
+
+      {% if project.looking_for %}
+      <div class="pd-looking-for">Looking for: {{ project.looking_for }}</div>
+      {% endif %}
+
+      <div class="pd-actions">
+        {% if not is_creator %}
+        <button class="btn {% if project.user_interested(current_user) %}btn-gold{% else %}btn-ghost{% endif %}" id="interestBtn" onclick="toggleProjectInterest({{ project.id }})">
+          {% if project.user_interested(current_user) %}Interested{% else %}Express Interest{% endif %}
+        </button>
+        <span class="pd-interest-count" id="interestCount">{{ project.interest_count }} interested</span>
+        {% else %}
+        <a href="{{ url_for('features.edit_project', project_id=project.id) }}" class="btn btn-ghost">Edit</a>
+        <span class="pd-interest-count">{{ project.interest_count }} interested</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Interested Members -->
+  {% if project.interests|length > 0 %}
+  <div class="pd-section">
+    <h2>Interested members</h2>
+    <div class="pd-interest-list">
+      {% for interest in project.interests %}
+      <a href="{{ url_for('profile', user_id=interest.user.id) }}" class="pd-interest-chip">
+        <span class="pd-avatar">
+          {% if interest.user.profile_photo %}
+          <img src="{{ url_for('static', filename=interest.user.profile_photo) }}" alt="">
+          {% else %}
+          {{ interest.user.name[0]|upper }}
+          {% endif %}
+        </span>
+        <span>{{ interest.user.name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Progress Updates -->
+  <div class="pd-section">
+    <h2>Progress updates</h2>
+
+    {% if is_creator %}
+    <form method="POST" action="{{ url_for('features.project_update', project_id=project.id) }}" enctype="multipart/form-data" class="pd-update-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <textarea name="content" placeholder="What progress did you make?" required></textarea>
+      <div class="pd-update-form-actions">
+        <input type="file" name="image" accept="image/*" style="font-size:12px;color:#888;">
+        <button type="submit" class="btn btn-gold btn-sm" style="margin-left:auto;">Post update</button>
+      </div>
+    </form>
+    {% endif %}
+
+    {% for update in project.updates %}
+    <div class="pd-update">
+      <div class="pd-update-meta">{{ update.time_ago }}</div>
+      <div class="pd-update-content">{{ update.content }}</div>
+      {% if update.image_path %}
+      <img src="{{ url_for('static', filename=update.image_path) }}" alt="">
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="pd-empty">No updates yet{% if is_creator %} — post the first one{% endif %}.</div>
+    {% endfor %}
+  </div>
+
+  <!-- Support this Builder (payment methods) -->
+  {% if project.payment_methods or is_creator %}
+  <div class="pd-section">
+    <h2>Support this builder</h2>
+
+    {% if project.payment_methods %}
+    <div class="pd-pay-disclaimer">
+      <strong>Sovereign Society does not process these payments.</strong>
+      You're transacting directly with the project creator off-platform. We do not custody, escrow, or refund.
+      Use your own judgment and verify with the creator before sending.
+    </div>
+
+    <div class="pd-pay-list">
+      {% for pm in project.payment_methods %}
+      <div class="pd-pay-row">
+        <div class="pd-pay-icon">{{ pm.method_type[:3]|upper }}</div>
+        <div class="pd-pay-info">
+          <div class="pd-pay-info-label">{{ pm.display_label }}</div>
+          <div class="pd-pay-info-addr" id="pmAddr{{ pm.id }}">{{ pm.address_or_handle }}</div>
+        </div>
+        <div class="pd-pay-actions">
+          {% if pm.is_url %}
+          <a href="{{ pm.address_or_handle }}" target="_blank" rel="noopener noreferrer">Open</a>
+          {% endif %}
+          <button type="button" onclick="copyPmAddr({{ pm.id }}, this)">Copy</button>
+          {% if is_creator %}
+          <form method="POST" action="{{ url_for('features.project_payment_method_delete', project_id=project.id, pm_id=pm.id) }}" style="display:inline;" onsubmit="return confirm('Remove this payment method?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" style="color:#c97070;border-color:#3a1010;">Remove</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="pd-empty">No payment methods configured yet.</div>
+    {% endif %}
+
+    {% if is_creator %}
+    <form method="POST" action="{{ url_for('features.project_payment_method_add', project_id=project.id) }}" class="pd-pay-add">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>Payment type</label>
+      <select name="method_type" required>
+        {% for mt in payment_method_types %}
+        <option value="{{ mt }}">{{ mt }}</option>
+        {% endfor %}
+      </select>
+      <label>Address or handle</label>
+      <input type="text" name="address_or_handle" required placeholder="0x... / $cashtag / @venmo / paypal.me/..." maxlength="500">
+      <label>Label (optional)</label>
+      <input type="text" name="label" maxlength="100" placeholder="e.g. Primary wallet">
+      <button type="submit" class="btn btn-gold btn-sm">Add payment method</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleProjectInterest(projectId) {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  fetch(`/projects/${projectId}/interest`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+    body: JSON.stringify({})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) return;
+    const btn = document.getElementById('interestBtn');
+    btn.textContent = data.interested ? 'Interested' : 'Express Interest';
+    btn.className = 'btn ' + (data.interested ? 'btn-gold' : 'btn-ghost');
+    document.getElementById('interestCount').textContent = data.count + ' interested';
+  });
+}
+
+function copyPmAddr(pmId, btn) {
+  const text = document.getElementById('pmAddr' + pmId).textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = orig; }, 1400);
+  }).catch(() => {
+    btn.textContent = 'Copy failed';
+  });
+}
+</script>
+{% endblock %}

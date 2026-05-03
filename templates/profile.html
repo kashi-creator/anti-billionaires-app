@@ -69,7 +69,37 @@
         </div>
     </div>
 
-    <div class="profile-posts">
+    {% if projects %}
+    <div class="profile-projects" style="margin-top:2rem">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1rem;">
+        <h2 style="margin:0;">Projects</h2>
+        {% if current_user.id == user.id %}
+        <a href="{{ url_for('features.create_project') }}" class="btn btn-ghost btn-xs">Post a Project</a>
+        {% endif %}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;">
+        {% for project in projects %}
+        <a href="{{ url_for('features.project_detail', project_id=project.id) }}" style="display:block;background:#0e0e0e;border:1px solid #1f1f1f;border-radius:6px;padding:1rem;text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='#3a2f10'" onmouseout="this.style.borderColor='#1f1f1f'">
+          <div style="display:flex;gap:6px;margin-bottom:0.4rem;flex-wrap:wrap;">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:3px 8px;border-radius:3px;background:rgba(212,175,55,0.12);color:#D4AF37;border:1px solid rgba(212,175,55,0.3);">{{ project.status|capitalize }}</span>
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;padding:3px 8px;border-radius:3px;background:#161616;color:#888;border:1px solid #2a2a2a;">{{ project.project_type|capitalize }}</span>
+          </div>
+          <div style="color:#fff;font-size:15px;font-weight:600;margin-bottom:4px;line-height:1.3;">{{ project.title }}</div>
+          {% if project.summary %}
+          <div style="color:#888;font-size:12px;line-height:1.5;">{{ project.summary[:120] }}{% if project.summary|length > 120 %}...{% endif %}</div>
+          {% endif %}
+          <div style="color:#666;font-size:11px;margin-top:0.5rem;">{{ project.interest_count }} interested · updated {{ project.time_ago }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% elif current_user.id == user.id %}
+    <div class="profile-projects" style="margin-top:2rem;padding:1rem;background:#0c0c0c;border:1px dashed #2a2a2a;border-radius:6px;text-align:center;color:#888;font-size:13px;">
+      No projects yet. <a href="{{ url_for('features.create_project') }}" style="color:#D4AF37;">Share what you're building &rarr;</a>
+    </div>
+    {% endif %}
+
+    <div class="profile-posts" style="margin-top:2rem">
         <h2>Posts</h2>
         {% for post in posts %}
         <div class="post-card" id="post-{{ post.id }}">

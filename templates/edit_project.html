@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ project.title }}{% endblock %}
+
+{% block content %}
+<style>
+  .project-form-page { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem; }
+  .project-form-page h1 { font-family: 'Cormorant Garamond', serif; color: #fff; font-size: 2rem; margin: 0 0 0.5rem 0; }
+  .project-form-page .subtitle { color: #888; font-size: 14px; margin: 0 0 1.5rem 0; line-height: 1.5; }
+
+  .project-form { background: #0e0e0e; border: 1px solid #1f1f1f; border-radius: 6px; padding: 1.5rem; }
+  .project-form .pf-row { margin-bottom: 1.1rem; }
+  .project-form label { display: block; color: #ddd; font-size: 13px; margin-bottom: 6px; font-weight: 500; }
+  .project-form .pf-hint { display: block; color: #777; font-size: 11px; margin-top: 4px; line-height: 1.4; }
+  .project-form input[type="text"],
+  .project-form input[type="file"],
+  .project-form select,
+  .project-form textarea {
+    width: 100%; box-sizing: border-box;
+    background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #fff; padding: 10px 12px; font-size: 14px;
+    font-family: inherit;
+  }
+  .project-form input:focus,
+  .project-form select:focus,
+  .project-form textarea:focus { outline: none; border-color: #D4AF37; }
+  .project-form textarea { min-height: 110px; resize: vertical; }
+  .project-form .pf-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+  .project-form .pf-actions .btn { flex: 1; }
+
+  .project-form-cover-current {
+    display: block; max-width: 200px; max-height: 120px;
+    border-radius: 4px; margin-bottom: 8px; border: 1px solid #2a2a2a;
+  }
+
+  .danger-zone {
+    margin-top: 2rem; padding: 1.25rem; border: 1px solid #3a1010;
+    background: rgba(180,40,40,0.05); border-radius: 6px;
+  }
+  .danger-zone h3 { color: #c97070; margin: 0 0 0.5rem 0; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .danger-zone p { color: #999; font-size: 13px; line-height: 1.5; margin: 0 0 1rem 0; }
+  .btn-danger {
+    background: transparent; border: 1px solid #c97070; color: #c97070;
+    padding: 8px 16px; border-radius: 4px; font-size: 13px; cursor: pointer;
+  }
+  .btn-danger:hover { background: rgba(180,40,40,0.1); }
+</style>
+
+<div class="project-form-page">
+  <h1>Edit Project</h1>
+  <p class="subtitle">{{ project.title }}</p>
+
+  <form method="POST" enctype="multipart/form-data" class="project-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="pf-row">
+      <label>Title <span style="color:#D4AF37">*</span></label>
+      <input type="text" name="title" required maxlength="200" value="{{ project.title }}">
+    </div>
+
+    <div class="pf-row">
+      <label>One-liner summary</label>
+      <input type="text" name="summary" maxlength="500" value="{{ project.summary or '' }}">
+    </div>
+
+    <div class="pf-row">
+      <label>Full description</label>
+      <textarea name="description">{{ project.description or '' }}</textarea>
+    </div>
+
+    <div class="pf-row" style="display: flex; gap: 1rem;">
+      <div style="flex: 1;">
+        <label>Status</label>
+        <select name="status">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if s == project.status %}selected{% endif %}>{{ s|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex: 1;">
+        <label>Type</label>
+        <select name="project_type">
+          {% for t in types %}
+          <option value="{{ t }}" {% if t == project.project_type %}selected{% endif %}>{{ t|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="pf-row">
+      <label>Looking for</label>
+      <input type="text" name="looking_for" maxlength="100" value="{{ project.looking_for or '' }}">
+    </div>
+
+    <div class="pf-row">
+      <label>Cover image</label>
+      {% if project.cover_image %}
+      <img src="{{ url_for('static', filename=project.cover_image) }}" alt="" class="project-form-cover-current">
+      <span class="pf-hint">Upload a new image to replace the current cover, or leave blank to keep it.</span>
+      {% endif %}
+      <input type="file" name="cover_image" accept="image/*">
+    </div>
+
+    <div class="pf-row">
+      <label>Visibility</label>
+      <select name="visibility">
+        <option value="members_only" {% if project.visibility == 'members_only' %}selected{% endif %}>Members only</option>
+        {% if can_brotherhood or project.visibility == 'brotherhood_only' %}
+        <option value="brotherhood_only" {% if project.visibility == 'brotherhood_only' %}selected{% endif %}>Brotherhood only — Lifetime members only</option>
+        {% endif %}
+      </select>
+    </div>
+
+    <div class="pf-actions">
+      <a href="{{ url_for('features.project_detail', project_id=project.id) }}" class="btn btn-ghost">Cancel</a>
+      <button type="submit" class="btn btn-gold">Save Changes</button>
+    </div>
+  </form>
+
+  {% if project.is_active %}
+  <div class="danger-zone">
+    <h3>Archive this project</h3>
+    <p>Hides it from public feeds. You can still reach it by direct URL. Archive is reversible — contact the team if you change your mind.</p>
+    <form method="POST" action="{{ url_for('features.project_archive', project_id=project.id) }}" onsubmit="return confirm('Archive this project? It will be hidden from public feeds.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn-danger">Archive</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
