@@ -283,18 +283,22 @@ def _seed_content():
 
     # --- SPACES ---
     spaces_data = [
-        ("Sovereign Wealth", "Building outside the rigged casino. Business, crypto, real assets, off-grid income streams. We build wealth they can't print away."),
-        ("Body & Iron", "Fitness, nutrition, cutting the poison. Real food, real training, real results. Your body is your first empire."),
-        ("Awake Minds", "Suppressed knowledge, psychedelics, consciousness, and our place in the cosmos. Question everything. Accept nothing at face value."),
-        ("Brotherhood Ops", "Supporting each other's businesses, referrals, accountability. We rise together or not at all."),
-        ("The Arsenal", "2A discussion, preparedness, self-defense, personal sovereignty. The ultimate safeguard of a free people."),
-        ("Red Pill Intel", "Elite corruption, trafficking, media lies, what they don't want you to see. Drag the truth into the light."),
-        ("Family & Legacy", "Raising strong children, protecting your bloodline, building generational wealth. What you build must outlast you."),
-        ("Off Grid", "Growing real food, land ownership, self-sufficiency, decentralization. Break the dependency chain."),
+        ("Sovereign Wealth", "Building outside the rigged casino. Business, crypto, real assets, off-grid income streams. We build wealth they can't print away.", "img/seed/space-sovereign-wealth.png"),
+        ("Body & Iron", "Fitness, nutrition, cutting the poison. Real food, real training, real results. Your body is your first empire.", "img/seed/space-body-iron.png"),
+        ("Awake Minds", "Suppressed knowledge, psychedelics, consciousness, and our place in the cosmos. Question everything. Accept nothing at face value.", "img/seed/space-awake-minds.png"),
+        ("Brotherhood Ops", "Supporting each other's businesses, referrals, accountability. We rise together or not at all.", "img/seed/space-brotherhood-ops.png"),
+        ("The Arsenal", "2A discussion, preparedness, self-defense, personal sovereignty. The ultimate safeguard of a free people.", "img/seed/space-arsenal.png"),
+        ("Red Pill Intel", "Elite corruption, trafficking, media lies, what they don't want you to see. Drag the truth into the light.", "img/seed/space-red-pill-intel.png"),
+        ("Family & Legacy", "Raising strong children, protecting your bloodline, building generational wealth. What you build must outlast you.", "img/seed/space-family-legacy.png"),
+        ("Off Grid", "Growing real food, land ownership, self-sufficiency, decentralization. Break the dependency chain.", "img/seed/space-off-grid.png"),
     ]
-    for name, desc in spaces_data:
-        if not Space.query.filter_by(name=name).first():
-            space = Space(name=name, description=desc, created_by=admin_id)
+    for name, desc, cover_image in spaces_data:
+        existing = Space.query.filter_by(name=name).first()
+        if existing:
+            if not existing.cover_image:
+                existing.cover_image = cover_image
+        else:
+            space = Space(name=name, description=desc, cover_image=cover_image, created_by=admin_id)
             db.session.add(space)
     db.session.commit()
 
