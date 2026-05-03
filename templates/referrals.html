@@ -166,7 +166,7 @@
       <div class="ref-eyebrow">You earned your seat</div>
       <div class="ref-counter" style="font-size:64px;">{{ qualified_count }}<span class="slash">/</span><span class="total">{{ threshold }}</span></div>
       <p class="ref-tagline">
-        You've stopped paying. Your access is permanent. Keep recruiting if you want — every member you bring strengthens the Society.
+        You've stopped paying. Your access is permanent. Keep recruiting if you want. Every member you bring strengthens the Society.
       </p>
     {% else %}
       <div class="ref-eyebrow">Your path to lifetime access</div>
@@ -179,7 +179,7 @@
         <p class="ref-tagline"><strong>You're at the threshold.</strong> Lifetime access activating shortly.</p>
       {% elif remaining_to_lifetime == 1 %}
         <p class="ref-tagline">
-          <strong>One more qualified referral and you're done paying — forever.</strong>
+          <strong>One more qualified referral and you're done paying. Forever.</strong>
         </p>
       {% else %}
         <p class="ref-tagline">
@@ -217,11 +217,11 @@
       <button class="ref-copy-btn" id="copyBtn" onclick="copyRefLink()">Copy</button>
     </div>
 
-    {% set share_x = "Just joined a private society — operators, accountability, deal flow. " ~ referral_url %}
-    {% set share_sms = "Check this out — Sovereign Society. Private network for operators. " ~ referral_url %}
-    {% set share_wa = "Joined this private operator society — thought of you. " ~ referral_url %}
+    {% set share_x = "Just joined a private society. Operators, accountability, deal flow. " ~ referral_url %}
+    {% set share_sms = "Check this out. Sovereign Society. Private network for operators. " ~ referral_url %}
+    {% set share_wa = "Joined this private operator society. Thought of you. " ~ referral_url %}
     {% set share_email_subject = "Sovereign Society" %}
-    {% set share_email_body = "Found a private network you might want to be part of — operators, accountability, deal flow.\n\n" ~ referral_url ~ "\n\nGo through this link if you join." %}
+    {% set share_email_body = "Found a private network you might want to be part of. Operators, accountability, deal flow.\n\n" ~ referral_url ~ "\n\nGo through this link if you join." %}
 
     <div class="ref-share-buttons">
       <a class="ref-share-btn" id="shareNative" href="#" onclick="nativeShare(); return false;" style="display:none;">Share…</a>
@@ -245,7 +245,7 @@
 
     <details style="margin-top:20px;">
       <summary style="color:#D4AF37;cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase;">Suggested message</summary>
-      <div class="ref-script" id="suggestedMsg">Joined a private network called Sovereign Society — operators, accountability, deal flow. Real people, no LinkedIn vibes. Go through this if you check it out: {{ referral_url }}</div>
+      <div class="ref-script" id="suggestedMsg">Joined a private network called Sovereign Society. Operators, accountability, deal flow. Real people, no LinkedIn vibes. Go through this if you check it out: {{ referral_url }}</div>
       <button class="ref-share-btn" style="margin-top:8px;" onclick="copySuggested()">Copy message</button>
     </details>
   </div>

@@ -1,7 +1,7 @@
 {% extends "emails/_layout.html" %}
 {% block content %}
 <h1 style="font-family:Georgia,serif;font-size:24px;color:#D4AF37;margin:0 0 16px 0;">This week at Sovereign Society</h1>
-<p>Hi {{ user.name }} — here's what you're missing.</p>
+<p>Hi {{ user.name }}, here's what you're missing.</p>
 
 {% if top_wins %}
 <h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">Top wins</h2>
@@ -12,13 +12,13 @@
 
 {% if spotlight %}
 <h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">Member spotlight</h2>
-<p><strong>{{ spotlight.name }}</strong> — {{ spotlight.bio[:200] }}</p>
+<p><strong>{{ spotlight.name }}:</strong> {{ spotlight.bio[:200] }}</p>
 {% endif %}
 
 {% if upcoming_events %}
 <h2 style="font-family:Georgia,serif;font-size:18px;color:#D4AF37;margin:32px 0 12px 0;border-bottom:1px solid #2a2a2a;padding-bottom:8px;">This week</h2>
 {% for e in upcoming_events %}
-<p style="margin:0 0 8px 0;"><strong>{{ e.date }}</strong> — {{ e.title }}</p>
+<p style="margin:0 0 8px 0;"><strong>{{ e.date }}:</strong> {{ e.title }}</p>
 {% endfor %}
 {% endif %}
 

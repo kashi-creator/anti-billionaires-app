@@ -1,11 +1,11 @@
 {% extends "emails/_layout.html" %}
 {% block content %}
 <h1 style="font-family:Georgia,serif;font-size:24px;color:#D4AF37;margin:0 0 16px 0;">Payment received</h1>
-<p>Hi {{ user.name }} — we received your payment of <strong style="color:#D4AF37;">{{ amount }}</strong>.</p>
+<p>Hi {{ user.name }}, we received your payment of <strong style="color:#D4AF37;">{{ amount }}</strong>.</p>
 
 <p style="background:#1a1a1a;border-left:3px solid #D4AF37;padding:16px;margin:24px 0;">
   <strong style="color:#D4AF37;">Your path to lifetime access:</strong><br>
-  Refer 3 active members who each stay paid for 6 months — then you stop paying, forever.
+  Refer 3 active members who each stay paid for 6 months. Then you stop paying, forever.
 </p>
 
 <p>Stripe will send you an itemized receipt separately.</p>

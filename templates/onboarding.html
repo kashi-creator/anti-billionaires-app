@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Welcome — step {{ step }}{% endblock %}
+{% block title %}Welcome, step {{ step }}{% endblock %}
 
 {% block content %}
 <style>
@@ -60,6 +60,16 @@
   .ob-space.selected { border-color:#D4AF37; background:rgba(212,175,55,0.06); }
   .ob-space-name { color:#fff; font-weight:bold; margin-bottom:4px; font-size:15px; }
   .ob-space-desc { color:#888; font-size:13px; line-height:1.4; }
+
+  @media (max-width: 600px) {
+    .ob-wrap { margin: 24px auto; padding: 0 16px; }
+    .ob-card { padding: 32px 20px; }
+    .ob-h1 { font-size: 30px; }
+    .ob-sub { margin-bottom: 28px; }
+    .ob-spaces { grid-template-columns: 1fr; }
+    .ob-actions { flex-direction: column-reverse; align-items: stretch; }
+    .ob-actions .ob-btn-skip { text-align: center; }
+  }
 </style>
 
 <div class="ob-wrap">
@@ -78,7 +88,7 @@
 
       {% if step == 1 %}
         <h1 class="ob-h1">Show your face.</h1>
-        <p class="ob-sub">Members put names to faces. Real photo only — no logos, no stock.</p>
+        <p class="ob-sub">Members put names to faces. Real photo only. No logos, no stock.</p>
         <div class="ob-photo-preview" id="photoPreview">
           {% if current_user.profile_photo %}
             <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
@@ -122,7 +132,7 @@
       {% elif step == 5 %}
         <h1 class="ob-h1">Your first post.</h1>
         <p class="ob-sub">Introduce yourself to the Society. What you're working on. What you need. What you can offer.</p>
-        <textarea class="ob-textarea" name="first_post" placeholder="Hey — I'm {{ current_user.name.split(' ')[0] }}. I..." maxlength="5000"></textarea>
+        <textarea class="ob-textarea" name="first_post" placeholder="Hey, I'm {{ current_user.name.split(' ')[0] }}. I..." maxlength="5000"></textarea>
 
       {% endif %}
 

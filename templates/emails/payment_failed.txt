@@ -5,4 +5,4 @@ We tried to charge your card but it was declined.
 Update your payment method to keep your access active:
 {{ update_url }}
 
-— Sovereign Society
+Sovereign Society

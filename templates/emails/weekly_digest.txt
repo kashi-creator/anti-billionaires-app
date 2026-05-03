@@ -6,7 +6,7 @@ THIS WEEK AT THE 1% MEN'S CLUB
 {% for w in top_wins %}- {{ w.author_name }}: {{ w.content[:140] }}
 {% endfor %}{% endif %}
 {% if spotlight %}MEMBER SPOTLIGHT
-{{ spotlight.name }} — {{ spotlight.bio[:200] }}
+{{ spotlight.name }}: {{ spotlight.bio[:200] }}
 {% endif %}
 {% if upcoming_events %}UPCOMING
 {% for e in upcoming_events %}- {{ e.date }}: {{ e.title }}
