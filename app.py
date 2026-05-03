@@ -29,10 +29,12 @@ from models import (
     Resource, ResourceUpvote, MemberGoal, AccountabilityPair, GoalCheckIn,
     Bookmark, Badge, UserBadge, Reel, SpaceChat, AIChat,
     Availability, CallBooking, Activity, StripeEvent, DeviceToken,
+    AssessmentResponse,
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
 from lib import ghl
+from lib import assessment as assessment_lib
 
 app = Flask(__name__)
 
@@ -475,6 +477,107 @@ def privacy():
     return render_template("legal.html", title="Privacy Policy", body_template="legal_privacy")
 
 
+# ===== Phase 5 — Self-Assessment =====
+# Runs BEFORE the 5-step onboarding for new signups. Re-takeable from /assessment.
+# NOTE: cannot use @paywall_required here — that decorator forces a redirect to
+# /onboarding when onboarding is incomplete, which would loop assessment users
+# straight past the assessment. Instead we mirror /onboarding's pattern:
+# @login_required + manual has_active_subscription check.
+
+
+def _post_signup_redirect(user):
+    """Where to send a freshly-signed-up user.
+
+    Flow: assessment (40q) → onboarding (5 steps) → feed.
+    Returns a Flask redirect Response.
+    """
+    if not getattr(user, "assessment_complete", False):
+        return redirect(url_for("assessment"))
+    if not getattr(user, "onboarding_complete", False):
+        return redirect(url_for("onboarding"))
+    return redirect(url_for("feed"))
+
+
+def _post_signup_redirect_url(user):
+    """URL-string variant for JSON callers (e.g. /signup-with-code)."""
+    if not getattr(user, "assessment_complete", False):
+        return url_for("assessment")
+    if not getattr(user, "onboarding_complete", False):
+        return url_for("onboarding")
+    return url_for("feed")
+
+
+@app.route("/assessment", methods=["GET"])
+@login_required
+def assessment():
+    if not current_user.has_active_subscription:
+        return redirect(url_for("pricing"))
+    return render_template(
+        "assessment.html",
+        pillars=assessment_lib.PILLARS,
+        likert=assessment_lib.LIKERT,
+    )
+
+
+@app.route("/assessment/submit", methods=["POST"])
+@login_required
+@require_csrf
+def assessment_submit():
+    if not current_user.has_active_subscription:
+        return jsonify({"error": "membership required"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    answers = payload.get("answers")
+
+    ok, err = assessment_lib.validate_answers(answers)
+    if not ok:
+        return jsonify(err), 400
+
+    scores = assessment_lib.compute_pillar_scores(answers)
+    response = AssessmentResponse(
+        user_id=current_user.id,
+        submitted_at=datetime.utcnow(),
+        answers_json=json.dumps(answers),
+        pillar_scores_json=json.dumps(scores),
+    )
+    db.session.add(response)
+    current_user.assessment_complete = True
+    db.session.commit()
+
+    return jsonify({"redirect": url_for("assessment_results"), "scores": scores})
+
+
+@app.route("/assessment/results", methods=["GET"])
+@login_required
+def assessment_results():
+    if not current_user.has_active_subscription:
+        return redirect(url_for("pricing"))
+    latest = (AssessmentResponse.query
+              .filter_by(user_id=current_user.id)
+              .order_by(AssessmentResponse.submitted_at.desc())
+              .first())
+    if not latest:
+        return redirect(url_for("assessment"))
+    scores = json.loads(latest.pillar_scores_json or "{}")
+    return render_template(
+        "assessment_results.html",
+        response=latest,
+        pillars=assessment_lib.PILLARS,
+        scores=scores,
+    )
+
+
+@app.route("/assessment/skip", methods=["POST"])
+@login_required
+@require_csrf
+def assessment_skip():
+    if not current_user.has_active_subscription:
+        return redirect(url_for("pricing"))
+    current_user.assessment_complete = True
+    db.session.commit()
+    return redirect(url_for("onboarding"))
+
+
 ONBOARDING_STEPS = 5  # photo -> bio -> location -> spaces -> first post
 
 
@@ -861,7 +964,7 @@ def signup_with_code():
         app.logger.warning("send_lifetime_unlocked failed (non-fatal): %s", e)
 
     login_user(user, remember=True)
-    return jsonify({"redirect": url_for("phase3.welcome")})
+    return jsonify({"redirect": _post_signup_redirect_url(user)})
 
 
 @app.route("/logout")
@@ -1378,7 +1481,7 @@ def subscription_success():
             existing_user.subscription_current_period_end = period_end
             db.session.commit()
         login_user(existing_user, remember=True)
-        return redirect(url_for("onboarding") if not existing_user.onboarding_complete else url_for("feed"))
+        return _post_signup_redirect(existing_user)
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -1428,7 +1531,7 @@ def subscription_success():
             custom_fields=ghl.custom_fields_from_user(user),
         )
         flash("Welcome to the Society. Check your email to confirm.", "success")
-        return redirect(url_for("onboarding"))
+        return _post_signup_redirect(user)
 
     return render_template("signup.html", email=email, session_id=session_id, stripe_mode=True)
 

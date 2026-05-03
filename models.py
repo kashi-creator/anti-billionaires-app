@@ -37,6 +37,8 @@ class User(UserMixin, db.Model):
     lat = db.Column(db.Float, default=None)
     lng = db.Column(db.Float, default=None)
     show_on_map = db.Column(db.Boolean, default=True)
+    # 'hidden' | 'city_only' | 'proximity_visible' (Phase 6 — location search)
+    location_visibility = db.Column(db.String(20), nullable=False, default="city_only")
 
     # Booking
     bookings_enabled = db.Column(db.Boolean, default=False)
@@ -68,6 +70,9 @@ class User(UserMixin, db.Model):
 
     # Onboarding (Phase 6)
     onboarding_complete = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Self-Assessment (Phase 5) — runs BEFORE onboarding on first signup
+    assessment_complete = db.Column(db.Boolean, default=False, nullable=False)
 
     # Email throttling (Phase 8) — last time we sent any engagement email to this user
     last_engagement_email_at = db.Column(db.DateTime, default=None)
@@ -979,3 +984,13 @@ class Activity(db.Model):
         elif seconds < 3600: return f"{int(seconds // 60)}m ago"
         elif seconds < 86400: return f"{int(seconds // 3600)}h ago"
         else: return f"{int(seconds // 86400)}d ago"
+
+
+class AssessmentResponse(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    submitted_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    answers_json = db.Column(db.Text, nullable=False)
+    pillar_scores_json = db.Column(db.Text, nullable=False)
+
+    user = db.relationship("User", backref="assessment_responses")
