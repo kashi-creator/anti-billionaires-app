@@ -8,6 +8,7 @@ Also exposes Python helpers used inline by route handlers
 (e.g. notify_dm_throttled in features_routes.send_message).
 """
 from datetime import datetime, timedelta
+import click
 from flask.cli import AppGroup
 
 from models import db, User, Win, Activity, Event, Message, Conversation
@@ -60,7 +61,11 @@ def _build_digest_data(since: datetime, until: datetime):
         .all()
     )
     top_wins_data = [
-        {"author_name": w.author.name if w.author else "Member", "content": w.content}
+        {
+            "author_name": w.author.name if w.author else "Member",
+            # Win has title + description, not a single `content` column.
+            "content": f"{w.title} - {w.description}" if w.description else w.title,
+        }
         for w in top_wins
     ]
 
@@ -71,16 +76,22 @@ def _build_digest_data(since: datetime, until: datetime):
         .first()
     )
 
+    # Event has separate `date` (Date) + `time` (str) columns — no `starts_at`.
+    today = datetime.utcnow().date()
+    week_out = today + timedelta(days=7)
     upcoming = (
         Event.query
-        .filter(Event.starts_at >= datetime.utcnow(), Event.starts_at < datetime.utcnow() + timedelta(days=7))
-        .order_by(Event.starts_at.asc())
+        .filter(Event.date >= today, Event.date < week_out)
+        .order_by(Event.date.asc())
         .limit(5)
         .all()
     )
     upcoming_data = [
-        {"date": e.starts_at.strftime("%a %b %d"), "title": e.title}
-        for e in upcoming if hasattr(e, "starts_at") and e.starts_at
+        {
+            "date": e.date.strftime("%a %b %d") + (f" {e.time}" if e.time else ""),
+            "title": e.title,
+        }
+        for e in upcoming if e.date
     ]
 
     return {
@@ -130,9 +141,10 @@ def cli_digest():
 def cli_test_email():
     """flask cron test-email -- send a test email to verify Resend wiring."""
     from email_send import send_email
-    admin_email = (User.query.filter_by(is_admin=True).first() or {}).email if User.query.filter_by(is_admin=True).first() else None
-    if not admin_email:
-        print("No admin user found.")
+    admin = User.query.filter_by(is_admin=True).first()
+    if not admin:
+        click.echo("No admin user found - set ADMIN_EMAILS or create one.")
         return
+    admin_email = admin.email
     send_email(to=admin_email, subject="Resend test", body_text="If you can read this, Resend is wired up correctly.", async_=False)
-    print(f"Sent to {admin_email}")
+    click.echo(f"Sent to {admin_email}")
