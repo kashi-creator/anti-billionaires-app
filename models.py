@@ -123,7 +123,7 @@ class User(UserMixin, db.Model):
             return True
         if self.lifetime_access:
             return True
-        return self.subscription_status == "active"
+        return self.subscription_status in ("active", "trialing")
 
     def add_points(self, amount):
         self.points = (self.points or 0) + amount
