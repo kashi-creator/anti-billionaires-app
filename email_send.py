@@ -20,13 +20,17 @@ def _send_via_resend(to, subject, text, html):
     resend.api_key = os.environ["RESEND_API_KEY"]
     from_addr = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")
     from_name = os.environ.get("EMAIL_FROM_NAME", "Sovereign Society")
-    resend.Emails.send({
+    payload = {
         "from": f"{from_name} <{from_addr}>",
         "to": [to],
         "subject": subject,
         "text": text,
         "html": html,
-    })
+    }
+    reply_to = os.environ.get("EMAIL_REPLY_TO")
+    if reply_to:
+        payload["reply_to"] = reply_to
+    resend.Emails.send(payload)
 
 
 def _send_now(to, subject, text, html):
@@ -76,7 +80,7 @@ def send_email(to, subject, body_text=None, body_html=None, template=None, conte
 def send_welcome_verify(user, verify_url):
     return send_email(
         to=user.email,
-        subject="Welcome to Sovereign Society — confirm your email",
+        subject="Welcome to Sovereign Society. Confirm your email",
         template="welcome_verify",
         context={"user": user, "verify_url": verify_url},
     )
@@ -96,7 +100,7 @@ def send_payment_succeeded(user, amount_cents, payments_made, lifetime_unlocked=
     (toward their referrer's qualification at 6)."""
     return send_email(
         to=user.email,
-        subject="Payment received — Sovereign Society",
+        subject="Payment received. Sovereign Society",
         template="payment_succeeded",
         context={
             "user": user,
@@ -113,7 +117,7 @@ def send_referral_progress(referrer, referee, qualified_count, threshold):
     (i.e. they just locked in another qualified referral)."""
     return send_email(
         to=referrer.email,
-        subject=f"{referee.name} just qualified — {qualified_count} of {threshold}",
+        subject=f"{referee.name} just qualified. {qualified_count} of {threshold}",
         template="referral_qualified",
         context={
             "referrer": referrer,
