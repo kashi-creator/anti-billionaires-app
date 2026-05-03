@@ -16,7 +16,7 @@
             <p class="auth-subtitle">Where sovereign men build without permission</p>
             {% endif %}
         </div>
-        <form method="POST" enctype="multipart/form-data" class="auth-form"
+        <form method="POST" class="auth-form"
               {% if stripe_mode is defined and stripe_mode %}
               action="{{ url_for('subscription_success', session_id=session_id) }}"
               {% endif %}>

@@ -1,6 +1,6 @@
 Hi {{ user.name }},
 
-THIS WEEK AT THE 1% MEN'S CLUB
+THIS WEEK AT SOVEREIGN SOCIETY
 
 {% if top_wins %}TOP WINS
 {% for w in top_wins %}- {{ w.author_name }}: {{ w.content[:140] }}
