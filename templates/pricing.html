@@ -136,6 +136,14 @@ document.getElementById('code-toggle').addEventListener('click', function(e) {
     codeSection.classList.toggle('active');
 });
 
+// Shared inline-input style (matches the existing #coupon-code styling on line ~108).
+const FOUNDER_INPUT_STYLE = 'width:100%;padding:10px 14px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#fff;font-size:0.9rem;margin-bottom:8px;';
+
+function getCsrfToken() {
+    const m = document.querySelector('meta[name=csrf-token]');
+    return m ? m.content : '';
+}
+
 // Validate code
 document.getElementById('apply-code-btn').addEventListener('click', async function() {
     const code = document.getElementById('coupon-code').value;
@@ -154,8 +162,20 @@ document.getElementById('apply-code-btn').addEventListener('click', async functi
         // Update main CTA
         const btn = document.getElementById('checkout-btn');
         btn.dataset.founder = 'true';
-        btn.textContent = '\u2713 Code applied \u2014 free access';
+        btn.textContent = '\u2713 Code applied \u2014 claim your seat';
         btn.style.background = 'linear-gradient(135deg, #D4AF37, #B8941F)';
+
+        // Swap the email field for a 3-field founder mini-form (name, email, password).
+        // Email value is reused if the visitor already typed it.
+        const emailField = document.getElementById('pricing-email');
+        if (emailField && !document.getElementById('founder-name')) {
+            const parent = emailField.parentElement;
+            const existingEmail = (emailField.value || '').trim();
+            parent.innerHTML =
+                '<input type="text" id="founder-name" placeholder="Your name" required style="' + FOUNDER_INPUT_STYLE + '">' +
+                '<input type="email" id="founder-email" placeholder="Email" value="' + existingEmail.replace(/"/g, '&quot;') + '" required style="' + FOUNDER_INPUT_STYLE + '">' +
+                '<input type="password" id="founder-password" placeholder="Password (10+ chars)" minlength="10" required style="' + FOUNDER_INPUT_STYLE + 'margin-bottom:0;">';
+        }
     } else {
         // Shake animation
         const input = document.getElementById('coupon-code');
@@ -166,8 +186,54 @@ document.getElementById('apply-code-btn').addEventListener('click', async functi
     }
 });
 
-// Main CTA
+// Main CTA \u2014 branches on dataset.founder ('true' = founder code path; otherwise Stripe path).
 document.getElementById('checkout-btn').addEventListener('click', async function() {
+    if (this.dataset.founder === 'true') {
+        // Founder code path: hit /signup-with-code; redirect to /welcome on success.
+        const nameEl = document.getElementById('founder-name');
+        const emailEl = document.getElementById('founder-email');
+        const passwordEl = document.getElementById('founder-password');
+        const name = nameEl ? nameEl.value.trim() : '';
+        const email = emailEl ? emailEl.value.trim() : '';
+        const password = passwordEl ? passwordEl.value : '';
+        const code = document.getElementById('coupon-code').value.trim();
+
+        if (!name || !email || !password || !code) {
+            alert('Fill in name, email, and password.');
+            return;
+        }
+        if (password.length < 10) {
+            alert('Password must be at least 10 characters.');
+            return;
+        }
+
+        this.disabled = true;
+        const originalText = this.textContent;
+        this.textContent = 'Creating your seat...';
+        try {
+            const r = await fetch('/signup-with-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({ name: name, email: email, password: password, code: code }),
+            });
+            const result = await r.json();
+            if (result.redirect) {
+                window.location.href = result.redirect;
+                return;
+            }
+            alert(result.error || 'Something went wrong.');
+        } catch (err) {
+            alert('Could not create account. Please try again.');
+        }
+        this.textContent = originalText;
+        this.disabled = false;
+        return;
+    }
+
+    // ---- Existing Stripe path \u2014 UNCHANGED below this line. ----
     const email = document.getElementById('pricing-email').value.trim();
     if (!email) {
         alert('Please enter your email address.');

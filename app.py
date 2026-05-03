@@ -130,12 +130,23 @@ def _inject_native_flag():
 
 
 def require_csrf(f):
-    """Enforce CSRF on a route. Used while WTF_CSRF_CHECK_DEFAULT is False."""
+    """Enforce CSRF on a route. Used while WTF_CSRF_CHECK_DEFAULT is False.
+
+    Accepts the token via either the form field ``csrf_token`` or the
+    ``X-CSRFToken`` header (Flask-WTF's canonical header) so JSON fetch
+    callers can pass the token without form-encoding their body.
+    """
     @wraps(f)
     def wrapper(*args, **kwargs):
         if request.method == "POST" and app.config.get("WTF_CSRF_ENABLED", True):
+            token = (
+                request.form.get("csrf_token")
+                or request.headers.get("X-CSRFToken")
+                or request.headers.get("X-CSRF-Token")
+                or ""
+            )
             try:
-                validate_csrf(request.form.get("csrf_token", ""))
+                validate_csrf(token)
             except Exception:
                 abort(400, description="Invalid or missing CSRF token")
         return f(*args, **kwargs)
@@ -804,6 +815,67 @@ def signup():
     return render_template("signup.html", email=prefilled_email)
 
 
+@app.route("/signup-with-code", methods=["POST"])
+@limiter.limit("5 per minute")
+@require_csrf
+def signup_with_code():
+    """Create a fully-active lifetime account from a valid founder code.
+
+    Mirrors the operational pattern of ``admin_grant_lifetime`` (lifetime_access
+    flip + active subscription_status + GHL push + lifetime email) but skips
+    the admin-only gate and the email-verification step. JSON-in, JSON-out.
+
+    Pairs with ``/validate-code`` (which both share ``_is_founder_code``) and
+    the founder-mode branch in ``templates/pricing.html``.
+    """
+    if current_user.is_authenticated:
+        return jsonify({"redirect": url_for("feed")})
+
+    data = request.get_json(silent=True) or request.form
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    code = (data.get("code") or "").strip()
+
+    if not name or not email or not password or not code:
+        return jsonify({"error": "All fields are required."}), 400
+    if len(password) < 10:
+        return jsonify({"error": "Password must be at least 10 characters."}), 400
+    if not _is_founder_code(code):
+        return jsonify({"error": "Invalid founder code."}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "An account with this email already exists. Please log in."}), 400
+
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    user = User(
+        name=name,
+        email=email,
+        password_hash=hashed,
+        points=0,
+        streak_days=1,
+        last_login_date=date.today(),
+        subscription_status="active",
+        lifetime_access=True,
+        lifetime_qualified_at=datetime.utcnow(),
+        email_verified=True,
+    )
+    user.ensure_referral_code()
+    db.session.add(user)
+    db.session.commit()
+
+    # GHL push — legacy taxonomy (Phase 1 sweeps to canonical lifetime-qualified).
+    ghl_upsert_contact(email, name, tags=["Lifetime", "ABMC"])
+
+    # Welcome email — graceful degrade if RESEND_API_KEY is unset.
+    try:
+        send_lifetime_unlocked(user)
+    except Exception as e:
+        app.logger.warning("send_lifetime_unlocked failed (non-fatal): %s", e)
+
+    login_user(user, remember=True)
+    return jsonify({"redirect": url_for("phase3.welcome")})
+
+
 @app.route("/logout")
 @login_required
 def logout():
@@ -1225,11 +1297,27 @@ def pricing():
     return render_template("pricing.html", stripe_key=STRIPE_PUBLISHABLE_KEY)
 
 
+def _valid_founder_codes():
+    """Single source of truth for founder-code values. Reads env once per call.
+
+    Supports comma-separated multiple codes via ``FOUNDER_CODES`` (or the legacy
+    singular ``FOUNDER_CODE``). Default ``ABMC2026`` mirrors prior behavior.
+    """
+    raw = os.environ.get("FOUNDER_CODES") or os.environ.get("FOUNDER_CODE") or "ABMC2026"
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def _is_founder_code(code):
+    """Returns True iff the (stripped) string matches a current founder code."""
+    if not code:
+        return False
+    return code.strip() in _valid_founder_codes()
+
+
 @app.route("/validate-code", methods=["POST"])
 def validate_code():
-    code = request.json.get("code", "")
-    founder_codes = os.environ.get("FOUNDER_CODES", os.environ.get("FOUNDER_CODE", "ABMC2026")).split(",")
-    if code.strip() in [c.strip() for c in founder_codes]:
+    code = (request.json or {}).get("code", "") if request.is_json else request.form.get("code", "")
+    if _is_founder_code(code):
         return jsonify({"valid": True})
     return jsonify({"valid": False})
 
