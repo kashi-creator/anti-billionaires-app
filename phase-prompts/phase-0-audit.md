@@ -151,7 +151,7 @@ Both fixes are launch blockers per SoT §10.
 
 ## Step 5 — Update SoT
 
-Append a new top-level section `## 13. Phase 0 Audit Report — 2026-MM-DD` to `INTEGRATION-SOURCE-OF-TRUTH.md` (right above §11 Update Rules; §11 stays the last section). Inside §13, document everything discovered in Step 2 — full routes inventory, env var audit, Stripe state, GHL state, deploy state, email infra state, DB state, surprises.
+Append a new top-level section `## 13. Phase 0 Audit Report — 2026-05-DD` to the **end** of `INTEGRATION-SOURCE-OF-TRUTH.md`. Existing §11 (Update Rules) and §12 (Reference) stay where they are; the audit report is the new last section like an appendix. Inside §13, document everything discovered in Step 2 — full routes inventory, env var audit, Stripe state, GHL state, deploy state, email infra state, DB state, surprises.
 
 Also:
 - §1 Project Identity: fill in any [TBD] fields you confirmed (Live URL, Railway project name, GHL location ID — if discoverable, otherwise leave [TBD] with a note).
