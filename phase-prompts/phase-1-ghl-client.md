@@ -258,11 +258,31 @@ Three fixes, same file:
    admin_email = admin.email
    ```
 
-### 3.4 Standardize `STRIPE_PRICE_ID` and trial confirmation (informational, no code change)
+### 3.4 Fix `_external=True` email rendering in threaded context
+
+Surfaced by Phase 0C: `email_send.py` renders templates inside background threads. Templates use `url_for(..., _external=True)` which raises `RuntimeError` without a request context unless `SERVER_NAME` is configured.
+
+In `app.py` startup config (near the other `app.config[...]` lines around line 65-80), add:
+
+```python
+app.config["SERVER_NAME"] = os.environ.get("SERVER_NAME") or (
+    "anti-billionaires-app-production.up.railway.app" if ENV == "production" else None
+)
+app.config["PREFERRED_URL_SCHEME"] = "https"
+```
+
+Set `SERVER_NAME` in Railway env to the canonical URL — when custom domain locks (Q7 → `app.sovereignsociety.com`), update this env var.
+
+**Caveat:** `SERVER_NAME` affects cookie domain matching and blueprint URL generation. Verify locally:
+- `python app.py` starts (no error about Flask URL routing)
+- `/feed` still loads when logged in (cookie still binds correctly)
+- `/api/notifications/unread-count` still returns 200 (sub-domain edge case)
+
+### 3.5 Standardize `STRIPE_PRICE_ID` and trial confirmation (informational, no code change)
 
 Run: `grep -n "trial_period_days\|subscription_data" app.py` to confirm the checkout creation passes `subscription_data={"trial_period_days": 30}`. If it doesn't, that's a separate launch blocker — STOP and tell the manager. (Per Phase 0 audit, the trial decision is locked but the executor noted it could not verify the actual `STRIPE_PRICE_ID` is configured with the trial. This is a quick code check that doesn't touch code.)
 
-### 3.5 Backfill script (write but DO NOT run)
+### 3.6 Backfill script (write but DO NOT run)
 
 Create `scripts/backfill_ghl_tags.py`. Reads every `User` from the local DB, computes their canonical stage tag from `subscription_status` + `lifetime_access` + `payments_made_count`, calls `ghl.upsert_contact` with the canonical tag + custom fields. Idempotent.
 
