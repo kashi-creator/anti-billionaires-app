@@ -28,11 +28,10 @@ def upgrade():
             nullable=False,
             server_default='city_only',
         ))
-    # Legacy users with show_on_map=False become 'hidden'. Handles SQLite
-    # boolean-as-int (0) and Postgres boolean (false) in the same UPDATE.
+    # Legacy users with show_on_map=False become 'hidden'. Postgres rejects
+    # boolean-vs-int comparisons; use the boolean form which sqlite also accepts.
     op.execute(
-        "UPDATE \"user\" SET location_visibility = 'hidden' "
-        "WHERE show_on_map = 0 OR show_on_map = false"
+        "UPDATE \"user\" SET location_visibility = 'hidden' WHERE show_on_map IS FALSE"
     )
 
 
