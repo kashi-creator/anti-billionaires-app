@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Your Sovereign Code Scores{% endblock %}
+
+{% block content %}
+<style>
+  .ar-wrap { max-width: 720px; margin: 60px auto; padding: 0 24px; }
+  .ar-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px; padding: 56px 48px;
+  }
+  .ar-eyebrow {
+    font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+    color: #888; margin-bottom: 12px;
+  }
+  .ar-h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif; font-size: 48px; color: #fff;
+    margin: 0 0 12px 0; letter-spacing: -0.5px; line-height: 1.1;
+  }
+  .ar-sub { color:#888; margin-bottom: 40px; line-height: 1.6; }
+  .ar-grid { display: flex; flex-direction: column; gap: 0; margin: 32px 0; }
+  .ar-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 18px 0; border-bottom: 1px solid #1c1c1c;
+  }
+  .ar-row:last-child { border-bottom: none; }
+  .ar-pillar-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; color: #e8e8e8; letter-spacing: 0.5px;
+  }
+  .ar-score {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 28px; color: #D4AF37; font-weight: 600;
+  }
+  .ar-score-denom { color: #555; font-size: 18px; font-weight: 400; }
+  .ar-callout {
+    margin: 32px 0;
+    padding: 20px 24px;
+    background: rgba(212,175,55,0.04);
+    border-left: 2px solid #D4AF37;
+    color: #c5b07a; font-size: 14px; line-height: 1.6;
+  }
+  .ar-actions {
+    display: flex; gap: 16px; margin-top: 32px;
+  }
+  .ar-btn {
+    flex: 1;
+    padding: 14px 32px; background: linear-gradient(135deg, #D4AF37, #B8941F);
+    color: #0A0A0A; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+    font-size: 13px; border: none; border-radius: 4px; text-align: center;
+    text-decoration: none;
+  }
+
+  @media (max-width: 600px) {
+    .ar-wrap { margin: 24px auto; padding: 0 16px; }
+    .ar-card { padding: 32px 20px; }
+    .ar-h1 { font-size: 34px; }
+    .ar-pillar-name { font-size: 18px; }
+    .ar-score { font-size: 22px; }
+  }
+</style>
+
+<div class="ar-wrap">
+  <div class="ar-card">
+    <div class="ar-eyebrow">The Sovereign Code</div>
+    <h1 class="ar-h1">Where you stand today.</h1>
+    <p class="ar-sub">Eight pillars. Eight honest numbers. This is your starting point — not your verdict. The work is what moves them.</p>
+
+    <div class="ar-grid">
+      {% for pillar in pillars %}
+      <div class="ar-row">
+        <div class="ar-pillar-name">{{ pillar.name }}</div>
+        <div class="ar-score">
+          {{ "%.1f"|format(scores.get(pillar.slug, 0.0)) }}<span class="ar-score-denom"> / 5</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="ar-callout">
+      Your scores are private. Only you see them. You can retake this assessment anytime from your profile to track how the pillars shift as you do the work.
+    </div>
+
+    <div class="ar-actions">
+      <a class="ar-btn" href="{{ url_for('onboarding') }}">Begin onboarding</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}The Sovereign Code — Self Assessment{% endblock %}
+
+{% block content %}
+<style>
+  .as-wrap { max-width: 720px; margin: 60px auto; padding: 0 24px; }
+  .as-progress { display:flex; gap:6px; margin-bottom: 40px; justify-content: center; }
+  .as-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #1f1f1f;
+    transition: background 0.2s;
+  }
+  .as-dot.done { background: rgba(212,175,55,0.45); }
+  .as-dot.current { background: #D4AF37; box-shadow: 0 0 8px rgba(212,175,55,0.6); }
+  .as-card {
+    background: linear-gradient(180deg, #131313 0%, #0e0e0e 100%);
+    border: 1px solid #1f1f1f; border-radius: 12px; padding: 56px 48px;
+  }
+  .as-eyebrow {
+    font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+    color: #888; margin-bottom: 12px;
+  }
+  .as-h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif; font-size: 44px; color: #fff;
+    margin: 0 0 12px 0; letter-spacing: -0.5px; line-height: 1.1;
+  }
+  .as-sub { color:#888; margin-bottom: 40px; line-height: 1.6; }
+  .as-question {
+    margin-bottom: 32px; padding-bottom: 24px;
+    border-bottom: 1px solid #1c1c1c;
+  }
+  .as-question:last-of-type { border-bottom: none; margin-bottom: 12px; }
+  .as-q-text {
+    color: #e8e8e8; font-size: 16px; line-height: 1.5;
+    margin-bottom: 18px; font-weight: 500;
+  }
+  .as-likert {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .as-radio {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 6px; background: #0a0a0a; border: 1px solid #2a2a2a;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s;
+    text-align: center;
+  }
+  .as-radio input { position: absolute; opacity: 0; pointer-events: none; }
+  .as-radio:hover { border-color: #444; }
+  .as-radio.selected {
+    border-color: #D4AF37; background: rgba(212,175,55,0.08);
+  }
+  .as-radio-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px; color: #D4AF37; font-weight: 600;
+    line-height: 1;
+  }
+  .as-radio-label {
+    font-size: 10px; letter-spacing: 0.5px;
+    color: #777; margin-top: 6px; text-transform: uppercase;
+  }
+  .as-radio.selected .as-radio-label { color: #c5b07a; }
+  .as-actions {
+    display: flex; gap: 16px; margin-top: 40px; align-items: center;
+  }
+  .as-btn {
+    padding: 14px 32px; background: linear-gradient(135deg, #D4AF37, #B8941F);
+    color: #0A0A0A; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;
+    font-size: 13px; border: none; border-radius: 4px; cursor: pointer; flex: 1;
+  }
+  .as-btn:disabled {
+    background: #2a2a2a; color: #555; cursor: not-allowed;
+  }
+  .as-back {
+    background: transparent; color: #888; border: 1px solid #2a2a2a;
+    padding: 14px 24px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 4px; cursor: pointer;
+  }
+  .as-back:disabled { opacity: 0.4; cursor: not-allowed; }
+  .as-skip-row { text-align: center; margin-top: 24px; }
+  .as-skip {
+    background: none; border: none; color: #666; font-size: 12px;
+    text-decoration: underline; cursor: pointer; padding: 8px;
+  }
+  .as-skip:hover { color: #aaa; }
+  .as-pillar { display: none; }
+  .as-pillar.active { display: block; }
+  .as-error {
+    background: rgba(180, 60, 60, 0.1); border: 1px solid rgba(180,60,60,0.4);
+    color: #e89090; padding: 12px 16px; border-radius: 6px;
+    margin-top: 20px; font-size: 13px; display: none;
+  }
+  .as-error.show { display: block; }
+
+  @media (max-width: 600px) {
+    .as-wrap { margin: 24px auto; padding: 0 16px; }
+    .as-card { padding: 32px 20px; }
+    .as-h1 { font-size: 32px; }
+    .as-sub { margin-bottom: 28px; }
+    .as-likert { gap: 4px; }
+    .as-radio { padding: 10px 2px; }
+    .as-radio-num { font-size: 18px; }
+    .as-radio-label { font-size: 9px; }
+    .as-actions { flex-direction: column-reverse; align-items: stretch; }
+  }
+</style>
+
+<div class="as-wrap">
+  <div class="as-progress" id="asProgress">
+    {% for p in pillars %}
+    <div class="as-dot {% if loop.first %}current{% endif %}" data-step="{{ loop.index0 }}"></div>
+    {% endfor %}
+  </div>
+
+  <div class="as-card">
+    <form id="asForm" onsubmit="return false;">
+      {% for pillar in pillars %}
+      <div class="as-pillar {% if loop.first %}active{% endif %}" data-slug="{{ pillar.slug }}" data-index="{{ loop.index0 }}">
+        <div class="as-eyebrow">Pillar {{ loop.index }} of {{ pillars|length }} / {{ pillar.name|upper }}</div>
+        <h1 class="as-h1">{{ pillar.name }}</h1>
+        <p class="as-sub">Rate yourself honestly. There are no right answers — only true ones.</p>
+
+        {% for q in pillar.questions %}
+        {% set qidx = loop.index0 %}
+        <div class="as-question">
+          <div class="as-q-text">{{ q }}</div>
+          <div class="as-likert">
+            {% for opt in likert %}
+            <label class="as-radio">
+              <input type="radio" name="{{ pillar.slug }}__q{{ qidx }}"
+                     value="{{ opt.value }}"
+                     data-pillar="{{ pillar.slug }}"
+                     data-qindex="{{ qidx }}">
+              <span class="as-radio-num">{{ opt.value }}</span>
+              <span class="as-radio-label">{{ opt.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="as-actions">
+          <button type="button" class="as-back" data-action="back" {% if loop.first %}disabled{% endif %}>Back</button>
+          <button type="button" class="as-btn" data-action="next" disabled>
+            {% if loop.last %}See my scores{% else %}Continue{% endif %}
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="as-error" id="asError"></div>
+    </form>
+
+    <div class="as-skip-row">
+      <form method="POST" action="{{ url_for('assessment_skip') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="as-skip">Skip assessment for now</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PILLARS = {{ pillars|tojson }};
+  const QUESTIONS_PER_PILLAR = 5;
+  const csrfToken = "{{ csrf_token() }}";
+  const submitUrl = "{{ url_for('assessment_submit') }}";
+
+  const pillarEls = Array.from(document.querySelectorAll('.as-pillar'));
+  const dots = Array.from(document.querySelectorAll('.as-dot'));
+  const errEl = document.getElementById('asError');
+  let currentIdx = 0;
+
+  // Wire radio button selected state + enable Continue
+  document.querySelectorAll('.as-radio input').forEach(input => {
+    input.addEventListener('change', e => {
+      const radio = e.target;
+      const slug = radio.dataset.pillar;
+      const qIdx = radio.dataset.qindex;
+      // Clear .selected from same-question radios
+      document.querySelectorAll(`.as-radio input[data-pillar="${slug}"][data-qindex="${qIdx}"]`)
+        .forEach(r => r.parentElement.classList.remove('selected'));
+      radio.parentElement.classList.add('selected');
+      updateContinueState();
+    });
+  });
+
+  function updateContinueState() {
+    const pillarEl = pillarEls[currentIdx];
+    const slug = pillarEl.dataset.slug;
+    const allAnswered = Array.from({length: QUESTIONS_PER_PILLAR}).every((_, qIdx) => {
+      return !!document.querySelector(`input[data-pillar="${slug}"][data-qindex="${qIdx}"]:checked`);
+    });
+    pillarEl.querySelector('[data-action="next"]').disabled = !allAnswered;
+  }
+
+  function showPillar(idx) {
+    pillarEls.forEach((el, i) => el.classList.toggle('active', i === idx));
+    dots.forEach((d, i) => {
+      d.classList.toggle('current', i === idx);
+      d.classList.toggle('done', i < idx);
+    });
+    currentIdx = idx;
+    errEl.classList.remove('show');
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    updateContinueState();
+  }
+
+  function collectAnswers() {
+    const answers = {};
+    PILLARS.forEach(p => {
+      answers[p.slug] = [];
+      for (let q = 0; q < QUESTIONS_PER_PILLAR; q++) {
+        const checked = document.querySelector(`input[data-pillar="${p.slug}"][data-qindex="${q}"]:checked`);
+        answers[p.slug].push(checked ? parseInt(checked.value, 10) : null);
+      }
+    });
+    return answers;
+  }
+
+  async function submitAssessment() {
+    const answers = collectAnswers();
+    try {
+      const res = await fetch(submitUrl, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+        body: JSON.stringify({answers}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error
+          ? `Submission failed: ${data.error}${data.pillar ? ' (' + data.pillar + ')' : ''}`
+          : 'Submission failed. Please try again.';
+        errEl.classList.add('show');
+        return;
+      }
+      window.location.href = data.redirect;
+    } catch (e) {
+      errEl.textContent = 'Network error. Please try again.';
+      errEl.classList.add('show');
+    }
+  }
+
+  // Wire next/back buttons
+  document.querySelectorAll('[data-action="next"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentIdx < pillarEls.length - 1) {
+        showPillar(currentIdx + 1);
+      } else {
+        submitAssessment();
+      }
+    });
+  });
+  document.querySelectorAll('[data-action="back"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (currentIdx > 0) showPillar(currentIdx - 1);
+    });
+  });
+})();
+</script>
+{% endblock %}
