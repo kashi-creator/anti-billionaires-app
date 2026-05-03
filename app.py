@@ -270,10 +270,102 @@ with app.app_context():
         print(f"[STARTUP] Seed deferred: {_seed_err}", flush=True)
 
 
+def _next_weekday(anchor, weekday):
+    """Return the first date >= anchor whose weekday() matches `weekday` (0=Mon..6=Sun)."""
+    delta = (weekday - anchor.weekday()) % 7
+    return anchor + timedelta(days=delta)
+
+
+def _first_thursday_of(year, month):
+    """Date of the 1st Thursday in (year, month)."""
+    return _next_weekday(date(year, month, 1), 3)
+
+
+def _last_thursday_of(year, month):
+    """Date of the last Thursday in (year, month)."""
+    if month == 12:
+        next_month_first = date(year + 1, 1, 1)
+    else:
+        next_month_first = date(year, month + 1, 1)
+    last_day = next_month_first - timedelta(days=1)
+    delta = (last_day.weekday() - 3) % 7
+    return last_day - timedelta(days=delta)
+
+
+def _generate_upcoming_occurrences(template, weeks_ahead=8):
+    """Idempotently materialize the next `weeks_ahead` weeks of occurrences for a recurring template Event.
+
+    For each calendar date implied by the template's recurrence_rule that falls in
+    [today, today + weeks_ahead*7], create a child Event row pointing back at the template
+    (recurrence_parent_id=template.id, recurrence_rule="none", is_recurrence_template=False).
+    Existing child rows for the same date are skipped — safe to call repeatedly.
+
+    Per-occurrence rows preserve EventRSVP joins by event_id so members RSVP to a specific date.
+    Time/location are inherited from the template; admins can edit per-occurrence to vary
+    (e.g. the Thursday lunch alternates location each week).
+    """
+    if not template.is_recurrence_template:
+        return 0
+    rule = template.recurrence_rule
+    if rule == "none":
+        return 0
+
+    today = date.today()
+    horizon = today + timedelta(weeks=weeks_ahead)
+
+    target_dates = []
+    if rule == "every_thursday":
+        d = _next_weekday(today, 3)
+        while d <= horizon:
+            target_dates.append(d)
+            d += timedelta(days=7)
+    elif rule == "first_and_last_thursday_monthly":
+        # Walk months forward until past the horizon
+        y, m = today.year, today.month
+        while True:
+            for d in (_first_thursday_of(y, m), _last_thursday_of(y, m)):
+                if today <= d <= horizon and d not in target_dates:
+                    target_dates.append(d)
+            if m == 12:
+                y, m = y + 1, 1
+            else:
+                m += 1
+            if date(y, m, 1) > horizon:
+                break
+    else:
+        return 0
+
+    existing_dates = {
+        d for (d,) in db.session.query(Event.date).filter(
+            Event.recurrence_parent_id == template.id
+        ).all()
+    }
+
+    created = 0
+    for d in sorted(target_dates):
+        if d in existing_dates:
+            continue
+        child = Event(
+            title=template.title,
+            description=template.description,
+            date=d,
+            time=template.time or "",
+            location=template.location or "",
+            host_id=template.host_id,
+            cover_image=template.cover_image,
+            event_type=template.event_type,
+            chapter=template.chapter,
+            recurrence_rule="none",
+            recurrence_parent_id=template.id,
+            is_recurrence_template=False,
+        )
+        db.session.add(child)
+        created += 1
+    return created
+
+
 def _seed_content():
     """Populate spaces, events, and posts. Idempotent - checks before inserting."""
-    from datetime import timedelta
-
     # --- Ensure a system/admin user exists for authored content ---
     admin = User.query.filter_by(is_admin=True).first()
     if not admin:
@@ -304,47 +396,79 @@ def _seed_content():
             db.session.add(space)
     db.session.commit()
 
-    # --- EVENTS ---
+    # --- EVENTS (Phase 3 rework) ---
+    # Wipe stale Phase 0B events. Pre-real-traffic; no real RSVPs to lose.
+    # The cascade on Event.rsvps drops any seed RSVPs along with each row.
+    stale_titles = ["Fire to Fire - St. Pete", "Sovereign Wealth Workshop", "Brotherhood Summit"]
+    stale = Event.query.filter(
+        Event.title.in_(stale_titles), Event.recurrence_parent_id.is_(None)
+    ).all()
+    for ev in stale:
+        db.session.delete(ev)
+    if stale:
+        db.session.flush()
+
     today = date.today()
-    # Next Thursday
-    days_until_thursday = (3 - today.weekday()) % 7
-    if days_until_thursday == 0:
-        days_until_thursday = 7
-    next_thursday = today + timedelta(days=days_until_thursday)
+    st_pete_anchor = _first_thursday_of(today.year, today.month)
+    if st_pete_anchor < today:
+        ny, nm = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
+        st_pete_anchor = _first_thursday_of(ny, nm)
+    next_thursday = _next_weekday(today, 3)
+    if next_thursday == today:
+        next_thursday = today + timedelta(days=7)
 
-    # First Saturday of next month
-    if today.month == 12:
-        first_of_next = date(today.year + 1, 1, 1)
-    else:
-        first_of_next = date(today.year, today.month + 1, 1)
-    days_until_saturday = (5 - first_of_next.weekday()) % 7
-    first_saturday = first_of_next + timedelta(days=days_until_saturday)
+    def _seed_recurring_template(*, title, description, anchor_date, time, location,
+                                 event_type, chapter, recurrence_rule):
+        existing = Event.query.filter_by(title=title, is_recurrence_template=True).first()
+        if existing:
+            return existing
+        template = Event(
+            title=title,
+            description=description,
+            date=anchor_date,
+            time=time,
+            location=location,
+            host_id=admin_id,
+            event_type=event_type,
+            chapter=chapter,
+            recurrence_rule=recurrence_rule,
+            is_recurrence_template=True,
+        )
+        db.session.add(template)
+        db.session.flush()
+        return template
 
-    # 3 months from now (approx)
-    summit_month = today.month + 3
-    summit_year = today.year
-    while summit_month > 12:
-        summit_month -= 12
-        summit_year += 1
-    summit_date = date(summit_year, summit_month, today.day if today.day <= 28 else 28)
+    st_pete_template = _seed_recurring_template(
+        title="St. Petersburg Chapter Biweekly",
+        description=(
+            "Sovereign Society's St. Petersburg chapter biweekly meetup. The 1st and last Thursday of every month. "
+            "Brotherhood, accountability, and discussion. Open to all members."
+        ),
+        anchor_date=st_pete_anchor,
+        time="6:30 PM EST",
+        location="The Temple, 155 8th Street North, Saint Petersburg, FL 33701",
+        event_type="chapter_recurring",
+        chapter="St. Petersburg, FL",
+        recurrence_rule="first_and_last_thursday_monthly",
+    )
+    lunch_template = _seed_recurring_template(
+        title="Thursday Group Lunch",
+        description=(
+            "Weekly Thursday group lunch. Time and location alternate each week — confirm via the specific "
+            "Thursday's event card before showing up."
+        ),
+        anchor_date=next_thursday,
+        time="",
+        location="",
+        event_type="weekly_recurring",
+        chapter="Global",
+        recurrence_rule="every_thursday",
+    )
+    db.session.commit()
 
-    events_data = [
-        ("Fire to Fire - St. Pete",
-         "Weekly brotherhood gathering. Thursday evenings at REVO Wellness. Come ready to connect, share, and build.",
-         "REVO Wellness, 155 8th St N, St. Petersburg FL",
-         next_thursday, "6:30 PM"),
-        ("Sovereign Wealth Workshop",
-         "Monthly deep-dive into building wealth outside the traditional system. Crypto, real assets, business models that can't be shut down.",
-         "", first_saturday, "2:00 PM"),
-        ("Brotherhood Summit",
-         "Quarterly gathering of the entire brotherhood. Full day of training, strategy, and connection.",
-         "", summit_date, ""),
-    ]
-    for title, desc, location, evt_date, evt_time in events_data:
-        if not Event.query.filter_by(title=title).first():
-            event = Event(title=title, description=desc, location=location,
-                          date=evt_date, time=evt_time, host_id=admin_id)
-            db.session.add(event)
+    # Materialize the next 8 weeks of occurrences for both templates.
+    _generate_upcoming_occurrences(st_pete_template, weeks_ahead=8)
+    _generate_upcoming_occurrences(lunch_template, weeks_ahead=8)
     db.session.commit()
 
     # --- POSTS ---
@@ -475,6 +599,15 @@ def terms():
 @app.route("/privacy")
 def privacy():
     return render_template("legal.html", title="Privacy Policy", body_template="legal_privacy")
+
+
+@app.route("/manifesto")
+@login_required
+@paywall_required
+def manifesto():
+    from phase3_routes import _check_item_by_slug
+    _check_item_by_slug(current_user.id, "read-manifesto")
+    return render_template("manifesto.html")
 
 
 # ===== Phase 5 — Self-Assessment =====
@@ -648,6 +781,10 @@ def onboarding_submit():
                 current_user.lng = float(lng)
         except ValueError:
             pass
+        vis = (request.form.get("location_visibility") or "").strip()
+        if vis in ("hidden", "city_only", "proximity_visible"):
+            current_user.location_visibility = vis
+            current_user.show_on_map = (vis != "hidden")
         db.session.commit()
     elif step == 4 and not skip:
         chosen = request.form.getlist("space_ids")
@@ -667,6 +804,10 @@ def onboarding_submit():
             db.session.add(post)
             current_user.add_points(10)
             db.session.commit()
+
+    if current_user.bio and current_user.profile_photo:
+        from phase3_routes import _check_item_by_slug
+        _check_item_by_slug(current_user.id, "complete-profile")
 
     next_step = step + 1
     if next_step > ONBOARDING_STEPS:
@@ -706,10 +847,18 @@ def feed():
     checklist_total = len(checklist)
     checklist_pct = int((checklist_done / checklist_total) * 100) if checklist_total > 0 else 0
     checklist_all_done = checklist_done == checklist_total and checklist_total > 0
+    # Sidebar shows up to 5 items, incomplete first.
+    sidebar_checklist = sorted(checklist, key=lambda c: (c["completed"], c["item"].order_index))[:5]
+    sidebar_overflow = max(0, checklist_total - len(sidebar_checklist))
+
+    focus_composer = request.args.get("focus") == "composer"
 
     return render_template("feed.html", posts=posts, member_count=member_count, filter_type=filter_type,
-                           checklist=checklist, checklist_done=checklist_done, checklist_total=checklist_total,
-                           checklist_pct=checklist_pct, checklist_all_done=checklist_all_done)
+                           checklist=checklist, sidebar_checklist=sidebar_checklist,
+                           sidebar_overflow=sidebar_overflow,
+                           checklist_done=checklist_done, checklist_total=checklist_total,
+                           checklist_pct=checklist_pct, checklist_all_done=checklist_all_done,
+                           focus_composer=focus_composer)
 
 
 @app.route("/feed", methods=["POST"])
@@ -745,9 +894,8 @@ def create_post():
 
     db.session.commit()
 
-    # Auto-check "Make your first post" checklist item
-    from phase3_routes import _auto_check_item
-    _auto_check_item(current_user.id, "first post")
+    from phase3_routes import _check_item_by_slug
+    _check_item_by_slug(current_user.id, "first-post")
 
     flash("Post published.", "success")
     return redirect(url_for("feed"))
@@ -1099,10 +1247,9 @@ def edit_profile():
 
         db.session.commit()
 
-        # Auto-check "Complete your profile" checklist
         if current_user.bio and current_user.profile_photo:
-            from phase3_routes import _auto_check_item
-            _auto_check_item(current_user.id, "Complete your profile")
+            from phase3_routes import _check_item_by_slug
+            _check_item_by_slug(current_user.id, "complete-profile")
 
         flash("Profile updated.", "success")
         return redirect(url_for("profile", user_id=current_user.id))
@@ -1157,11 +1304,10 @@ def toggle_follow(user_id):
         )
         db.session.commit()
 
-        # Auto-check "Follow 3 members" checklist
         follow_count = Follow.query.filter_by(follower_id=current_user.id).count()
         if follow_count >= 3:
-            from phase3_routes import _auto_check_item
-            _auto_check_item(current_user.id, "Follow")
+            from phase3_routes import _check_item_by_slug
+            _check_item_by_slug(current_user.id, "follow-brothers")
 
         following = True
     return jsonify({
@@ -1232,9 +1378,8 @@ def join_space(space_id):
     db.session.add(membership)
     db.session.commit()
 
-    # Auto-check "Join a Space" checklist
-    from phase3_routes import _auto_check_item
-    _auto_check_item(current_user.id, "Join a Space")
+    from phase3_routes import _check_item_by_slug
+    _check_item_by_slug(current_user.id, "join-space")
 
     flash(f"Joined {space.name}.", "success")
     return redirect(url_for("space_detail", space_id=space_id))
