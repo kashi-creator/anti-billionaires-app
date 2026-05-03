@@ -4,7 +4,7 @@
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://onepercentmensclub.up.railway.app",
+    "url": "https://anti-billionaires-app-production.up.railway.app",
     "cleartext": false,
     "androidScheme": "https",
     "iosScheme": "https"
