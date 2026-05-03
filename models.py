@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
+from sqlalchemy.orm import validates
 from datetime import datetime, date
 import secrets
 
@@ -388,6 +389,20 @@ class PollVote(db.Model):
 
 # ============ EVENTS ============
 
+EVENT_TYPES = frozenset({
+    "chapter_recurring",
+    "weekly_recurring",
+    "member_meetup",
+    "official_one_off",
+})
+
+RECURRENCE_RULES = frozenset({
+    "none",
+    "every_thursday",
+    "first_and_last_thursday_monthly",
+})
+
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -400,8 +415,32 @@ class Event(db.Model):
     max_attendees = db.Column(db.Integer, default=None)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    event_type = db.Column(db.String(40), nullable=False, default="official_one_off")
+    chapter = db.Column(db.String(100), nullable=True)
+    recurrence_rule = db.Column(db.String(60), nullable=False, default="none")
+    recurrence_parent_id = db.Column(db.Integer, db.ForeignKey("event.id"), nullable=True, index=True)
+    is_recurrence_template = db.Column(db.Boolean, nullable=False, default=False)
+
     host = db.relationship("User", backref="hosted_events")
     rsvps = db.relationship("EventRSVP", backref="event", lazy=True, cascade="all, delete-orphan")
+    occurrences = db.relationship(
+        "Event",
+        backref=db.backref("recurrence_parent", remote_side="Event.id"),
+        cascade="all, delete-orphan",
+        single_parent=True,
+    )
+
+    @validates("event_type")
+    def _validate_event_type(self, key, value):
+        if value not in EVENT_TYPES:
+            raise ValueError(f"invalid event_type: {value!r}")
+        return value
+
+    @validates("recurrence_rule")
+    def _validate_recurrence_rule(self, key, value):
+        if value not in RECURRENCE_RULES:
+            raise ValueError(f"invalid recurrence_rule: {value!r}")
+        return value
 
     @property
     def going_count(self):
