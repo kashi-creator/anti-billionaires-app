@@ -26,7 +26,11 @@ from models import (
     Reel, SpaceChat, AIChat,
     Availability, CallBooking,
     Activity,
+    Project, ProjectUpdate, ProjectInterest, ProjectPaymentMethod,
+    PROJECT_STATUSES, PROJECT_TYPES, PROJECT_VISIBILITIES,
+    PROJECT_PAYMENT_METHOD_TYPES,
 )
+import re
 
 features = Blueprint('features', __name__)
 
@@ -374,6 +378,344 @@ def deal_interest(deal_id):
                          url_for('features.deal_detail', deal_id=deal.id))
     db.session.commit()
     return jsonify({"success": True, "interested": True, "count": deal.interest_count})
+
+
+# =====================================================================
+#  PROJECTS — member-published builds (Phase 7)
+# =====================================================================
+# Sister to Deal. Members publish 0-N projects (businesses, products, missions);
+# other members express interest, the creator posts progress updates over time.
+# Visibility tiered: members_only (default) / brotherhood_only (Lifetime+) /
+# private (creator-only, hidden from this phase's UI).
+#
+# Payment methods are a directory only — Sovereign Society does NOT process
+# payments. The transaction happens off-platform, member-to-member. See the
+# load-bearing disclaimer in `templates/project_detail.html`.
+#
+# Each route inlines the paywall+onboarding gate (mirrors `app.paywall_required`
+# body) to dodge the existing `app.py → features_routes.py` import cycle.
+
+
+def _project_paywall_or_redirect():
+    """Return a redirect Response when the current user can't access projects;
+    None when access is OK. Mirrors `app.paywall_required` body."""
+    if not current_user.has_active_subscription:
+        flash("Membership required to access this area.", "warning")
+        return redirect(url_for('pricing'))
+    if not current_user.onboarding_complete:
+        return redirect(url_for('onboarding'))
+    return None
+
+
+def _visible_projects(query, user):
+    """Filter a Project query to rows the given user can see, modulo the
+    self-view exception (creator always sees own active projects regardless
+    of visibility — applied separately by callers that want it).
+
+    Visibility model:
+    - lifetime_access (Lifetime+): members_only + brotherhood_only
+    - has_active_subscription (no lifetime): members_only only
+    - otherwise: nothing (paywall already blocks at the route level, so this
+      branch is defensive)
+
+    `private` is never returned by this helper — that tier is creator-only
+    by design (Phase 7+ surface; not in this phase's UI).
+    """
+    query = query.filter(Project.is_active == True)
+    if getattr(user, "lifetime_access", False):
+        return query.filter(Project.visibility.in_(["members_only", "brotherhood_only"]))
+    if getattr(user, "has_active_subscription", False):
+        return query.filter(Project.visibility == "members_only")
+    return query.filter(False)
+
+
+@features.route('/projects')
+@login_required
+def projects():
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    status = (request.args.get("status") or "").strip()
+    ptype = (request.args.get("type") or "").strip()
+    q = _visible_projects(Project.query, current_user)
+    if status in PROJECT_STATUSES:
+        q = q.filter(Project.status == status)
+    if ptype in PROJECT_TYPES:
+        q = q.filter(Project.project_type == ptype)
+    items = q.order_by(Project.updated_at.desc()).all()
+    return render_template(
+        'projects.html',
+        projects=items,
+        statuses=sorted(PROJECT_STATUSES),
+        types=sorted(PROJECT_TYPES),
+        selected_status=status,
+        selected_type=ptype,
+    )
+
+
+@features.route('/projects/create', methods=['GET', 'POST'])
+@login_required
+def create_project():
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    if request.method == 'POST':
+        title = (request.form.get("title") or "").strip()
+        summary = (request.form.get("summary") or "").strip()[:500]
+        description = (request.form.get("description") or "").strip()
+        status = (request.form.get("status") or "building").strip()
+        ptype = (request.form.get("project_type") or "business").strip()
+        looking_for = (request.form.get("looking_for") or "").strip()[:100]
+        visibility = (request.form.get("visibility") or "members_only").strip()
+        if not title:
+            flash("Project title is required.", "error")
+            return redirect(url_for('features.create_project'))
+        if len(title) > 200:
+            flash("Title is too long (max 200 chars).", "error")
+            return redirect(url_for('features.create_project'))
+        if status not in PROJECT_STATUSES:
+            flash("Invalid status.", "error")
+            return redirect(url_for('features.create_project'))
+        if ptype not in PROJECT_TYPES:
+            flash("Invalid project type.", "error")
+            return redirect(url_for('features.create_project'))
+        # Brotherhood_only restricted to Lifetime+ members.
+        if visibility == "brotherhood_only" and not current_user.lifetime_access:
+            visibility = "members_only"
+        if visibility not in ("members_only", "brotherhood_only"):
+            visibility = "members_only"
+        cover_image = None
+        if 'cover_image' in request.files:
+            f = request.files['cover_image']
+            if f and f.filename:
+                cover_image = _save_upload(f)
+        project = Project(
+            user_id=current_user.id, title=title, summary=summary,
+            description=description, status=status, project_type=ptype,
+            looking_for=looking_for, visibility=visibility, cover_image=cover_image,
+        )
+        db.session.add(project)
+        current_user.add_points(10)
+        db.session.flush()
+        _log_activity(
+            current_user.id, "posted_project", f'Posted a project: "{title}"',
+            url_for('features.project_detail', project_id=project.id),
+        )
+        db.session.commit()
+        flash("Project posted.", "success")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    return render_template(
+        'create_project.html',
+        statuses=sorted(PROJECT_STATUSES),
+        types=sorted(PROJECT_TYPES),
+        can_brotherhood=current_user.lifetime_access,
+    )
+
+
+@features.route('/projects/<int:project_id>')
+@login_required
+def project_detail(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    is_creator = project.user_id == current_user.id
+    # Self-view exception: creator can always see own project (any visibility,
+    # archived included). Everyone else: must pass the visibility filter
+    # AND the project must be active.
+    if not is_creator:
+        visible_ids = {p.id for p in _visible_projects(Project.query, current_user).all()}
+        if project.id not in visible_ids:
+            abort(404)
+    return render_template(
+        'project_detail.html',
+        project=project,
+        is_creator=is_creator,
+        payment_method_types=sorted(PROJECT_PAYMENT_METHOD_TYPES.keys()),
+    )
+
+
+@features.route('/projects/<int:project_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_project(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
+    if request.method == 'POST':
+        title = (request.form.get("title") or "").strip()
+        if not title or len(title) > 200:
+            flash("Title required (max 200 chars).", "error")
+            return redirect(url_for('features.edit_project', project_id=project.id))
+        status = (request.form.get("status") or project.status).strip()
+        ptype = (request.form.get("project_type") or project.project_type).strip()
+        visibility = (request.form.get("visibility") or project.visibility).strip()
+        if status not in PROJECT_STATUSES or ptype not in PROJECT_TYPES:
+            flash("Invalid status or type.", "error")
+            return redirect(url_for('features.edit_project', project_id=project.id))
+        if visibility == "brotherhood_only" and not current_user.lifetime_access:
+            visibility = "members_only"
+        if visibility not in ("members_only", "brotherhood_only"):
+            visibility = "members_only"
+        project.title = title
+        project.summary = (request.form.get("summary") or "").strip()[:500]
+        project.description = (request.form.get("description") or "").strip()
+        project.status = status
+        project.project_type = ptype
+        project.looking_for = (request.form.get("looking_for") or "").strip()[:100]
+        project.visibility = visibility
+        if 'cover_image' in request.files:
+            f = request.files['cover_image']
+            if f and f.filename:
+                project.cover_image = _save_upload(f)
+        db.session.commit()
+        flash("Project updated.", "success")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    return render_template(
+        'edit_project.html',
+        project=project,
+        statuses=sorted(PROJECT_STATUSES),
+        types=sorted(PROJECT_TYPES),
+        can_brotherhood=current_user.lifetime_access,
+    )
+
+
+@features.route('/projects/<int:project_id>/interest', methods=['POST'])
+@login_required
+def project_interest(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    # Visibility check: same as detail. Users can't toggle interest on a project
+    # they couldn't see in the first place.
+    if project.user_id != current_user.id:
+        visible_ids = {p.id for p in _visible_projects(Project.query, current_user).all()}
+        if project.id not in visible_ids:
+            abort(404)
+    existing = ProjectInterest.query.filter_by(
+        project_id=project.id, user_id=current_user.id
+    ).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        return jsonify({"success": True, "interested": False, "count": project.interest_count})
+    msg = ""
+    if request.is_json:
+        msg = (request.json or {}).get("message", "")
+    interest = ProjectInterest(project_id=project.id, user_id=current_user.id, message=msg)
+    db.session.add(interest)
+    if project.user_id != current_user.id:
+        _create_notification(
+            project.user_id, "project_interest",
+            f"{current_user.name} is interested in your project: {project.title}",
+            url_for('features.project_detail', project_id=project.id),
+        )
+    db.session.commit()
+    return jsonify({"success": True, "interested": True, "count": project.interest_count})
+
+
+@features.route('/projects/<int:project_id>/update', methods=['POST'])
+@login_required
+def project_update(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
+    content = (request.form.get("content") or "").strip()
+    if not content:
+        flash("Update content is required.", "error")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    image_path = None
+    if 'image' in request.files:
+        f = request.files['image']
+        if f and f.filename:
+            image_path = _save_upload(f)
+    update = ProjectUpdate(
+        project_id=project.id, user_id=current_user.id,
+        content=content, image_path=image_path,
+    )
+    db.session.add(update)
+    # Bump the project's updated_at so it floats to the top of the feed.
+    project.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash("Update posted.", "success")
+    return redirect(url_for('features.project_detail', project_id=project.id))
+
+
+@features.route('/projects/<int:project_id>/archive', methods=['POST'])
+@login_required
+def project_archive(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
+    project.is_active = False
+    db.session.commit()
+    flash("Project archived. It is hidden from public feeds.", "success")
+    return redirect(url_for('features.project_detail', project_id=project.id))
+
+
+# ---- Payment methods (directory only — SS does NOT process payments) ----
+
+PAYMENT_METHOD_SOFT_CAP = 10
+
+
+@features.route('/projects/<int:project_id>/payment-method', methods=['POST'])
+@login_required
+def project_payment_method_add(project_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
+    if len(project.payment_methods) >= PAYMENT_METHOD_SOFT_CAP:
+        flash(f"Soft cap of {PAYMENT_METHOD_SOFT_CAP} payment methods per project reached.", "error")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    method_type = (request.form.get("method_type") or "").strip()
+    address = (request.form.get("address_or_handle") or "").strip()
+    label = (request.form.get("label") or "").strip()[:100]
+    pattern = PROJECT_PAYMENT_METHOD_TYPES.get(method_type)
+    if not pattern:
+        flash("Unknown payment method type.", "error")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    if not address or not re.fullmatch(pattern, address):
+        flash(f"That doesn't look like a valid {method_type} address or handle.", "error")
+        return redirect(url_for('features.project_detail', project_id=project.id))
+    pm = ProjectPaymentMethod(
+        project_id=project.id, method_type=method_type,
+        address_or_handle=address, label=label,
+        sort_order=len(project.payment_methods),
+    )
+    db.session.add(pm)
+    db.session.commit()
+    flash("Payment method added.", "success")
+    return redirect(url_for('features.project_detail', project_id=project.id))
+
+
+@features.route('/projects/<int:project_id>/payment-method/<int:pm_id>/delete', methods=['POST'])
+@login_required
+def project_payment_method_delete(project_id, pm_id):
+    gate = _project_paywall_or_redirect()
+    if gate:
+        return gate
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        abort(403)
+    pm = ProjectPaymentMethod.query.get_or_404(pm_id)
+    if pm.project_id != project.id:
+        abort(404)
+    db.session.delete(pm)
+    db.session.commit()
+    flash("Payment method removed.", "success")
+    return redirect(url_for('features.project_detail', project_id=project.id))
 
 
 # =====================================================================

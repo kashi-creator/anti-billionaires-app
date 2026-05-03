@@ -30,6 +30,7 @@ from models import (
     Bookmark, Badge, UserBadge, Reel, SpaceChat, AIChat,
     Availability, CallBooking, Activity, StripeEvent, DeviceToken,
     AssessmentResponse,
+    Project,
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
@@ -1220,7 +1221,21 @@ def resend_verification():
 def profile(user_id):
     user = User.query.get_or_404(user_id)
     posts = Post.query.filter_by(user_id=user_id).order_by(Post.created_at.desc()).all()
-    return render_template("profile.html", user=user, posts=posts)
+
+    # Phase 7: surface the user's active projects on their profile, filtered
+    # by the same visibility tiers the /projects feed uses. Self-view returns
+    # all active projects regardless of visibility.
+    projects_q = Project.query.filter_by(user_id=user_id, is_active=True)
+    if current_user.id != user_id:
+        if getattr(current_user, "lifetime_access", False):
+            projects_q = projects_q.filter(Project.visibility.in_(["members_only", "brotherhood_only"]))
+        elif getattr(current_user, "has_active_subscription", False):
+            projects_q = projects_q.filter(Project.visibility == "members_only")
+        else:
+            projects_q = projects_q.filter(False)
+    projects = projects_q.order_by(Project.updated_at.desc()).all()
+
+    return render_template("profile.html", user=user, posts=posts, projects=projects)
 
 
 @app.route("/profile/edit", methods=["GET", "POST"])
