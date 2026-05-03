@@ -1034,3 +1034,161 @@ class AssessmentResponse(db.Model):
     pillar_scores_json = db.Column(db.Text, nullable=False)
 
     user = db.relationship("User", backref="assessment_responses")
+
+
+# ============ PROJECTS (Phase 7) ============
+# Member-published builds (businesses, products, missions). Sibling to Deal,
+# not a refactor — different intent (personal build vs transactional opportunity)
+# and different visibility model (members_only / brotherhood_only / private).
+
+PROJECT_STATUSES = frozenset({"idea", "building", "launching", "scaling", "paused"})
+PROJECT_TYPES = frozenset({"business", "build", "mission", "cause", "product"})
+PROJECT_VISIBILITIES = frozenset({"members_only", "brotherhood_only", "private"})
+
+# Locked payment-method vocab. Each entry: shape regex (anchored full-match).
+# Shape-check only — never resolve on-chain or call out to verify. Reject bad
+# shapes with a clear error so a typo doesn't end up rendered as a clickable
+# "send funds here" cue.
+PROJECT_PAYMENT_METHOD_TYPES = {
+    "eth":          r"^0x[a-fA-F0-9]{40}$",
+    "btc":          r"^(bc1[a-z0-9]{8,87}|[13][a-km-zA-HJ-NP-Z1-9]{25,39})$",
+    "sol":          r"^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+    "usdc_eth":     r"^0x[a-fA-F0-9]{40}$",
+    "usdc_sol":     r"^[1-9A-HJ-NP-Za-km-z]{32,44}$",
+    "cashapp":      r"^\$[A-Za-z][A-Za-z0-9_]{0,19}$",
+    "venmo":        r"^@?[A-Za-z0-9][A-Za-z0-9_\-]{1,29}$",
+    "paypal":       r"^(https?://)?(www\.)?paypal\.me/[A-Za-z0-9_\-.]+/?$",
+    "stripe_link":  r"^https://(buy\.stripe\.com|donate\.stripe\.com)/[A-Za-z0-9_\-/]+/?$",
+    "custom_link":  r"^https?://[^\s]+$",
+}
+
+
+class Project(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    summary = db.Column(db.String(500), default="")
+    description = db.Column(db.Text, default="")
+    status = db.Column(db.String(40), nullable=False, default="building")
+    project_type = db.Column(db.String(40), nullable=False, default="business")
+    looking_for = db.Column(db.String(100), default="")
+    cover_image = db.Column(db.String(300), default=None)
+    visibility = db.Column(db.String(20), nullable=False, default="members_only")
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    creator = db.relationship("User", backref="projects")
+    interests = db.relationship(
+        "ProjectInterest", backref="project", lazy=True, cascade="all, delete-orphan"
+    )
+    updates = db.relationship(
+        "ProjectUpdate", backref="project", lazy=True, cascade="all, delete-orphan",
+        order_by="ProjectUpdate.created_at.desc()",
+    )
+    payment_methods = db.relationship(
+        "ProjectPaymentMethod", backref="project", lazy=True, cascade="all, delete-orphan",
+        order_by="ProjectPaymentMethod.sort_order, ProjectPaymentMethod.id",
+    )
+
+    @validates("status")
+    def _validate_status(self, key, value):
+        if value not in PROJECT_STATUSES:
+            raise ValueError(f"invalid project status: {value!r}")
+        return value
+
+    @validates("project_type")
+    def _validate_project_type(self, key, value):
+        if value not in PROJECT_TYPES:
+            raise ValueError(f"invalid project_type: {value!r}")
+        return value
+
+    @validates("visibility")
+    def _validate_visibility(self, key, value):
+        if value not in PROJECT_VISIBILITIES:
+            raise ValueError(f"invalid project visibility: {value!r}")
+        return value
+
+    @property
+    def interest_count(self):
+        return len(self.interests)
+
+    def user_interested(self, user):
+        return any(i.user_id == user.id for i in self.interests)
+
+    @property
+    def time_ago(self):
+        diff = datetime.utcnow() - self.updated_at
+        seconds = diff.total_seconds()
+        if seconds < 60: return "just now"
+        elif seconds < 3600: return f"{int(seconds // 60)}m ago"
+        elif seconds < 86400: return f"{int(seconds // 3600)}h ago"
+        else: return f"{int(seconds // 86400)}d ago"
+
+
+class ProjectUpdate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    image_path = db.Column(db.String(300), default=None)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    author = db.relationship("User")
+
+    @property
+    def time_ago(self):
+        diff = datetime.utcnow() - self.created_at
+        seconds = diff.total_seconds()
+        if seconds < 60: return "just now"
+        elif seconds < 3600: return f"{int(seconds // 60)}m ago"
+        elif seconds < 86400: return f"{int(seconds // 3600)}h ago"
+        else: return f"{int(seconds // 86400)}d ago"
+
+
+class ProjectInterest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    message = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User")
+    __table_args__ = (db.UniqueConstraint("project_id", "user_id", name="unique_project_interest"),)
+
+
+class ProjectPaymentMethod(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("project.id"), nullable=False, index=True)
+    method_type = db.Column(db.String(40), nullable=False)
+    address_or_handle = db.Column(db.String(500), nullable=False)
+    label = db.Column(db.String(100), default="")
+    sort_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @validates("method_type")
+    def _validate_method_type(self, key, value):
+        if value not in PROJECT_PAYMENT_METHOD_TYPES:
+            raise ValueError(f"invalid payment method_type: {value!r}")
+        return value
+
+    @property
+    def is_url(self):
+        return self.method_type in ("paypal", "stripe_link", "custom_link")
+
+    @property
+    def display_label(self):
+        if self.label:
+            return self.label
+        return {
+            "eth": "Ethereum",
+            "btc": "Bitcoin",
+            "sol": "Solana",
+            "usdc_eth": "USDC (Ethereum)",
+            "usdc_sol": "USDC (Solana)",
+            "cashapp": "Cash App",
+            "venmo": "Venmo",
+            "paypal": "PayPal",
+            "stripe_link": "Stripe (card)",
+            "custom_link": "External link",
+        }.get(self.method_type, self.method_type)
