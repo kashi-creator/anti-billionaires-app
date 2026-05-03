@@ -9,7 +9,12 @@
     </a>
 
     <div class="form-card">
-        <h1>Create Event</h1>
+        <h1>{% if current_user.is_admin %}Create Event{% else %}Post a Local Meetup{% endif %}</h1>
+        {% if not current_user.is_admin %}
+        <p class="muted small" style="margin-top: 0.5rem;">
+            Members can post one-off meetups in their city. Official chapter and weekly events are seeded by the team.
+        </p>
+        {% endif %}
         <form method="POST" enctype="multipart/form-data" class="auth-form" style="margin-top:1.5rem;">
             <div class="form-group">
                 <label>Title</label>
@@ -31,7 +36,11 @@
             </div>
             <div class="form-group">
                 <label>Location <span class="optional">(optional)</span></label>
-                <input type="text" name="location" placeholder="Zoom link, address, etc.">
+                <input type="text" name="location" placeholder="Address, venue, or Zoom link">
+            </div>
+            <div class="form-group">
+                <label>City / Chapter <span class="optional">(optional)</span></label>
+                <input type="text" name="chapter" placeholder="e.g. Austin, TX">
             </div>
             <div class="form-group">
                 <label>Max Attendees <span class="optional">(optional)</span></label>
@@ -45,7 +54,33 @@
                 </label>
                 <input type="file" id="coverImage" name="cover_image" accept="image/*" hidden>
             </div>
-            <button type="submit" class="btn btn-gold btn-full">Create Event</button>
+
+            {% if current_user.is_admin %}
+            <div class="form-group">
+                <label>Event Type <span class="muted small">(admin)</span></label>
+                <select name="event_type">
+                    <option value="member_meetup">Member meetup (one-off)</option>
+                    <option value="chapter_recurring">Chapter recurring</option>
+                    <option value="weekly_recurring">Weekly recurring</option>
+                    <option value="official_one_off">Official one-off</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Recurrence <span class="muted small">(admin)</span></label>
+                <select name="recurrence_rule">
+                    <option value="none">None — single date</option>
+                    <option value="every_thursday">Every Thursday</option>
+                    <option value="first_and_last_thursday_monthly">First and last Thursday of each month</option>
+                </select>
+                <p class="muted small" style="margin-top: 0.4rem;">
+                    Recurring choice + a non-Member-Meetup type creates a template; child occurrences are auto-generated for the next 8 weeks.
+                </p>
+            </div>
+            {% endif %}
+
+            <button type="submit" class="btn btn-gold btn-full">
+                {% if current_user.is_admin %}Create Event{% else %}Post Meetup{% endif %}
+            </button>
         </form>
     </div>
 </div>

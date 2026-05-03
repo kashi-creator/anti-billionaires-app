@@ -23,6 +23,14 @@
             </div>
             <div>
                 <h1>{{ event.title }}</h1>
+                {% if event.recurrence_parent_id and event.recurrence_parent %}
+                <p class="muted small" style="margin: 0.25rem 0 0.5rem;">
+                    Part of: {{ event.recurrence_parent.title }} (recurring)
+                </p>
+                {% endif %}
+                {% if event.chapter %}
+                <p class="muted small" style="margin: 0 0 0.5rem;">{{ event.chapter }}</p>
+                {% endif %}
                 <div class="event-detail-meta">
                     {% if event.time %}
                     <span class="event-meta-line">
