@@ -34,7 +34,7 @@ def upgrade():
         batch_op.add_column(sa.Column('recurrence_parent_id', sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column(
             'is_recurrence_template', sa.Boolean(), nullable=False,
-            server_default=sa.text('0'),
+            server_default=sa.false(),
         ))
         batch_op.create_foreign_key(
             'fk_event_recurrence_parent_id',
