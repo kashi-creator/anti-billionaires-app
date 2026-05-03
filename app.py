@@ -1334,6 +1334,7 @@ def create_checkout_session():
             payment_method_types=["card"],
             line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
             mode="subscription",
+            allow_promotion_codes=True,
             success_url=request.host_url.rstrip("/") + url_for("subscription_success") + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=request.host_url.rstrip("/") + url_for("pricing"),
             metadata={"email": email},
