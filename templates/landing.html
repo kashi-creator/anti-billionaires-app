@@ -343,6 +343,21 @@
     transition: transform 0.3s, color 0.3s;
   }
 
+  /* SOVEREIGN CODE */
+  .sovereign-code {
+    list-style: none;
+    max-width: 720px;
+  }
+  .sovereign-code li {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(22px, 2.6vw, 36px);
+    line-height: 1.5;
+    color: var(--ink);
+    padding: 10px 0;
+    letter-spacing: -0.005em;
+  }
+
   /* TIERS */
   .tiers-head h2 {
     font-family: var(--serif);
@@ -549,7 +564,8 @@
     <a data-target="manifesto">01 Manifesto</a>
     <a data-target="pillars">02 The Work</a>
     <a data-target="tiers">03 Tiers</a>
-    <a data-target="proof">04 Voices</a>
+    <!-- Voices nav link hidden until real testimonials exist -->
+    <!-- <a data-target="proof">04 Voices</a> -->
     <a data-target="faq">05 FAQ</a>
   </div>
   <a href="{{ url_for('login') }}" class="hud-cta">Sign in</a>
@@ -579,21 +595,20 @@
   </div>
 </section>
 
-<!-- 02 / WHAT YOU GET -->
+<!-- 02 / THE SOVEREIGN CODE -->
 <section class="chapter pillars-section" id="pillars">
-  <div class="pillars-head">
-    <div class="chapter-meta reveal"><span class="chapter-num">02</span><span class="chapter-tag">The Work</span></div>
-    <h2 class="reveal delay-1">Six pillars.<br>One <em>brotherhood.</em></h2>
-    <p class="reveal delay-2">Everything you need to build, accumulate, and defend, alongside men who actually show up.</p>
-  </div>
-  <div class="pillars">
-    <div class="pillar reveal"><div class="pillar-num">01</div><div class="pillar-arrow">↗</div><h3>Deal Flow</h3><p>Curated opportunities: investments, partnerships, off-market plays. Posted only by members, vetted by the room.</p></div>
-    <div class="pillar reveal delay-1"><div class="pillar-num">02</div><div class="pillar-arrow">↗</div><h3>Accountability</h3><p>Goals, partners, weekly check-ins. We don't tolerate drift. Operators in this Society finish what they start.</p></div>
-    <div class="pillar reveal delay-2"><div class="pillar-num">03</div><div class="pillar-arrow">↗</div><h3>Mastermind Calls</h3><p>Weekly live calls. Monthly mixers. Guest speakers from the worlds of capital, defense, and physical sovereignty.</p></div>
-    <div class="pillar reveal"><div class="pillar-num">04</div><div class="pillar-arrow">↗</div><h3>The Vault</h3><p>Frameworks, scripts, contracts, playbooks. The exact tools members use to close deals and run their operations.</p></div>
-    <div class="pillar reveal delay-1"><div class="pillar-num">05</div><div class="pillar-arrow">↗</div><h3>The Map</h3><p>Member geographic map. Find the brothers near you. Real-world meetings. Real-world relationships.</p></div>
-    <div class="pillar reveal delay-2"><div class="pillar-num">06</div><div class="pillar-arrow">↗</div><h3>The Boardroom</h3><p>Gated channel for the highest-level operators. Platinum tier or Level 9+ only. The heaviest hitters connect here.</p></div>
-  </div>
+  <div class="chapter-meta reveal"><span class="chapter-num">02</span><span class="chapter-tag">The Work</span></div>
+  <h2 class="reveal delay-1">The <em>Sovereign Code.</em></h2>
+  <ul class="sovereign-code reveal delay-2">
+    <li>We live with purpose</li>
+    <li>We build strength</li>
+    <li>We create wealth</li>
+    <li>We honor brotherhood</li>
+    <li>We protect family</li>
+    <li>We walk in faith of a higher power</li>
+    <li>We expand awareness</li>
+    <li>We maintain control</li>
+  </ul>
 </section>
 
 <!-- 03 / TIERS -->
@@ -627,8 +642,8 @@
   </div>
 </section>
 
-<!-- 04 / PROOF -->
-<section class="chapter proof-section" id="proof">
+<!-- 04 / PROOF — hidden until real testimonials exist. Keep markup intact for easy re-enable. -->
+<section class="chapter proof-section" id="proof" style="display:none;">
   <div class="proof-head">
     <div class="chapter-meta reveal"><span class="chapter-num">04</span><span class="chapter-tag">Voices</span></div>
     <h2 class="reveal delay-1">From the <em>brothers</em> who built it.</h2>
@@ -656,12 +671,11 @@
     <h2 class="reveal delay-1">Before you <em>apply.</em></h2>
   </div>
   <div class="faq-list reveal delay-2">
-    <div class="faq-item"><div class="faq-q">Is this just another mastermind? <span class="faq-toggle">+</span></div><div class="faq-a">No. Masterminds end. The Society is a permanent network. Calls, deal flow, brotherhood, and a private platform built specifically for operators. You are not buying a course. You are joining a society.</div></div>
-    <div class="faq-item"><div class="faq-q">What does it cost? <span class="faq-toggle">+</span></div><div class="faq-a">$99 / month, ongoing. There is no fixed end to the membership. You can cancel any time. The Society also offers Lifetime Access, but you don't buy it, you earn it. Bring three brothers into the Society. Once each one has completed six paid months ($594 each), your billing ends permanently and your seat is yours for life.</div></div>
-    <div class="faq-item"><div class="faq-q">Who is this for? <span class="faq-toggle">+</span></div><div class="faq-a">Men who are already operators, builders, or serious about becoming one. Founders, investors, professionals, tradesmen, fathers. Anyone allergic to the soft, sanitized version of modern manhood.</div></div>
-    <div class="faq-item"><div class="faq-q">Who is this NOT for? <span class="faq-toggle">+</span></div><div class="faq-a">Tourists. Spectators. Men looking to be entertained instead of forged. If you're not ready to show up, contribute, and be held accountable, stay where you are.</div></div>
+    <div class="faq-item"><div class="faq-q">Is this just another mastermind? <span class="faq-toggle">+</span></div><div class="faq-a">No. The Sovereign Society is a lifelong pursuit of personal and professional development. Not a course, not a cohort, not a weekend event. It's built on a simple idea: when a man does the real work on himself, it moves through his business, his family, his community. The men in this room aren't here to finish a program. They're here to build something that outlasts them.</div></div>
+    <div class="faq-item"><div class="faq-q">What does it cost? <span class="faq-toggle">+</span></div><div class="faq-a">$99 / month, ongoing. Your first two meetings are free. The Society also offers free Lifetime Access, but you don't buy it, you earn it. Bring three brothers into the Society. Once each one has completed six paid months, your billing ends permanently and your seat is yours for life.</div></div>
+    <div class="faq-item"><div class="faq-q">Who is this for? <span class="faq-toggle">+</span></div><div class="faq-a">Men committed to the pursuit of becoming well-rounded. Men who understand that real growth comes through being of service to others, not just themselves. If you show up ready to give as much as you gain, you belong here.</div></div>
+    <div class="faq-item"><div class="faq-q">Who is this NOT for? <span class="faq-toggle">+</span></div><div class="faq-a">Men who aren't willing to step outside their comfort zone. If you're here to take from the room without putting anything back in, you won't last. We don't carry passengers. Members who don't contribute get removed.</div></div>
     <div class="faq-item"><div class="faq-q">How do I get in? <span class="faq-toggle">+</span></div><div class="faq-a">Apply through the membership page. Sign up with your card and your $99/month begins. We reserve the right to remove members who don't show up, but we'd much rather have you stay.</div></div>
-    <div class="faq-item"><div class="faq-q">Can I cancel? <span class="faq-toggle">+</span></div><div class="faq-a">Yes, any time. $99/month continues until you cancel or until you've referred three brothers who each completed six paid months. At that point your billing ends and your access becomes lifetime.</div></div>
   </div>
 </section>
 
