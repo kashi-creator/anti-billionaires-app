@@ -1685,9 +1685,12 @@ def subscription_success():
         # Trigger welcome + verify email
         send_verification_email(user)
 
+        # No trial — paid signups go straight to active-member on day 1.
+        # The webhook's invoice.payment_succeeded handler will idempotently
+        # re-tag with the same value once Stripe processes the first invoice.
         ghl.upsert_contact(
             email=email, name=name,
-            stage_tag="trialing",
+            stage_tag="active-member",
             custom_fields=ghl.custom_fields_from_user(user),
         )
         flash("Welcome to the Society. Check your email to confirm.", "success")
