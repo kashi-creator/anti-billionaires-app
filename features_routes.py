@@ -57,6 +57,8 @@ def _create_notification(user_id, ntype, message, link=None):
         return
     notif = Notification(user_id=user_id, type=ntype, message=message, link=link)
     db.session.add(notif)
+    from lib import push as push_lib
+    push_lib.send_push_to_user(user_id, "Sovereign", message, link or "/notifications")
 
 
 def _log_activity(user_id, action, detail="", link=None):

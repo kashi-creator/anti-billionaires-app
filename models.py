@@ -1005,6 +1005,22 @@ class DeviceToken(db.Model):
     last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
+class PushSubscription(db.Model):
+    """Web Push subscriptions registered by the PWA service worker.
+
+    Endpoint is a URL given to us by the browser's push service (FCM, Mozilla,
+    Apple). Keys are used to encrypt the payload. We delete on 410 Gone."""
+    __tablename__ = "push_subscription"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    endpoint = db.Column(db.String(700), nullable=False, unique=True, index=True)
+    p256dh = db.Column(db.String(200), nullable=False)
+    auth = db.Column(db.String(64), nullable=False)
+    user_agent = db.Column(db.String(300), default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Activity(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)

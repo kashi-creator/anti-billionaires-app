@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Generate a VAPID keypair for Web Push.
+
+Run once per deployment environment. Save the printed values into Railway
+(or your local .env) as:
+
+    VAPID_PUBLIC_KEY   — base64url, sent to browsers
+    VAPID_PRIVATE_KEY  — base64url, kept on the server
+    VAPID_CLAIM_EMAIL  — mailto: or https:// you control (push services log it)
+
+Usage:
+    python scripts/generate_vapid_keys.py
+"""
+import base64
+
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
+
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def main() -> None:
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key()
+
+    # Private: raw 32-byte scalar
+    private_numbers = private_key.private_numbers()
+    private_bytes = private_numbers.private_value.to_bytes(32, "big")
+
+    # Public: uncompressed 65-byte point (0x04 || X || Y)
+    public_bytes = public_key.public_bytes(
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint,
+    )
+
+    print("# --- Sovereign Society — VAPID keypair ---")
+    print("# Add these to Railway env vars (Production) and your local .env")
+    print()
+    print(f"VAPID_PUBLIC_KEY={b64url(public_bytes)}")
+    print(f"VAPID_PRIVATE_KEY={b64url(private_bytes)}")
+    print("VAPID_CLAIM_EMAIL=mailto:kashi@thebreathcoachschool.com")
+
+
+if __name__ == "__main__":
+    main()

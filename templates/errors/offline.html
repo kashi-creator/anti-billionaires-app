@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Offline{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-code">--</div>
+    <h1>You're Offline</h1>
+    <p>The signal dropped. Reconnect and we'll be right here.</p>
+    <button onclick="window.location.reload()" class="btn btn-gold" style="margin-top:2rem">Try Again</button>
+</div>
+{% endblock %}

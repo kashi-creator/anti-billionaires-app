@@ -12,8 +12,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sovereign">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='img/icons/icon-192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='img/icons/icon-512.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icons/apple-touch-icon.png') }}">
     <meta property="og:image" content="{{ url_for('static', filename='img/sovereign-logo.png', _external=True) }}">
     <meta name="twitter:card" content="summary_large_image">
     <title>{% block title %}Sovereign{% endblock %} | Sovereign Society</title>
@@ -30,7 +31,10 @@
     </style>
     {% if is_native_app %}<script src="https://cdn.jsdelivr.net/npm/@capacitor/core@6/dist/capacitor.min.js"></script>{% endif %}
 </head>
-<body class="{% if not current_user.is_authenticated %}no-nav{% endif %}">
+<body class="{% if not current_user.is_authenticated %}no-nav{% endif %}"
+      data-pwa-vapid-public-key="{{ vapid_public_key|default('', true) }}"
+      data-pwa-authed="{% if current_user.is_authenticated %}1{% else %}0{% endif %}"
+      data-pwa-csrf="{{ csrf_token() }}">
     <!-- Constellation background -->
     <canvas id="constellation"></canvas>
     <script>
@@ -293,6 +297,7 @@
     <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% if not is_native_app %}<script src="{{ url_for('static', filename='js/pwa.js') }}" defer></script>{% endif %}
     <script>
         function toggleMobileMenu() {
             const menu = document.getElementById('mobileMenu');

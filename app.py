@@ -36,6 +36,7 @@ from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
 from lib import ghl
 from lib import assessment as assessment_lib
+from lib import push as push_lib
 
 app = Flask(__name__)
 
@@ -198,6 +199,7 @@ def create_notification(user_id, type, message, link=None):
         return  # Don't notify yourself
     notif = Notification(user_id=user_id, type=type, message=message, link=link)
     db.session.add(notif)
+    push_lib.send_push_to_user(user_id, "Sovereign", message, link or "/notifications")
 
 
 def _admin_email_allowlist():
@@ -555,6 +557,85 @@ def index():
         # Authenticated but no membership: send to pricing.
         return redirect(url_for("pricing"))
     return render_template("landing.html")
+
+
+@app.route("/service-worker.js")
+def service_worker():
+    """Serve service-worker.js from root so its scope covers the entire app
+    (a SW served from /static can only control /static)."""
+    from flask import send_from_directory, make_response
+    resp = make_response(send_from_directory(
+        os.path.join(app.root_path, "static", "js"),
+        "service-worker.js",
+        mimetype="application/javascript",
+    ))
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+@app.route("/offline")
+def offline_page():
+    """Lightweight fallback rendered by the SW when navigation fails."""
+    return render_template("errors/offline.html"), 200
+
+
+@app.context_processor
+def _inject_vapid_public_key():
+    return {"vapid_public_key": push_lib.vapid_public_key()}
+
+
+@app.route("/push/subscribe", methods=["POST"])
+@login_required
+def push_subscribe():
+    """Browser PushManager subscription is POSTed here as JSON:
+    {endpoint, keys: {p256dh, auth}}. We upsert by endpoint so re-subscribes
+    don't create duplicates."""
+    payload = request.get_json(silent=True) or {}
+    endpoint = (payload.get("endpoint") or "").strip()
+    keys = payload.get("keys") or {}
+    p256dh = (keys.get("p256dh") or "").strip()
+    auth = (keys.get("auth") or "").strip()
+
+    if not endpoint or not p256dh or not auth:
+        return jsonify({"success": False, "error": "Missing subscription fields"}), 400
+
+    from models import PushSubscription
+    now = datetime.utcnow()
+    ua = request.headers.get("User-Agent", "")[:300]
+
+    existing = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if existing:
+        existing.user_id = current_user.id
+        existing.p256dh = p256dh
+        existing.auth = auth
+        existing.user_agent = ua
+        existing.last_seen_at = now
+    else:
+        db.session.add(PushSubscription(
+            user_id=current_user.id,
+            endpoint=endpoint,
+            p256dh=p256dh,
+            auth=auth,
+            user_agent=ua,
+            created_at=now,
+            last_seen_at=now,
+        ))
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/push/unsubscribe", methods=["POST"])
+@login_required
+def push_unsubscribe():
+    payload = request.get_json(silent=True) or {}
+    endpoint = (payload.get("endpoint") or "").strip()
+    if not endpoint:
+        return jsonify({"success": False}), 400
+    from models import PushSubscription
+    PushSubscription.query.filter_by(user_id=current_user.id, endpoint=endpoint).delete()
+    db.session.commit()
+    return jsonify({"success": True})
 
 
 @app.route("/api/devices/register", methods=["POST"])

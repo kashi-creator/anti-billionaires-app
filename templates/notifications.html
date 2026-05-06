@@ -10,6 +10,17 @@
         {% endif %}
     </div>
 
+    {% if vapid_public_key and not is_native_app %}
+    <div class="push-toggle-card" id="pushToggleCard" hidden>
+        <div class="push-toggle-text">
+            <strong>Push Notifications</strong>
+            <p id="pushToggleHelp">Get alerts on your phone or desktop when someone reaches out, reacts, or invites you.</p>
+        </div>
+        <span class="push-toggle-status" id="pushToggleStatus">OFF</span>
+        <button class="btn btn-gold btn-sm" id="pushToggleBtn" type="button">Enable</button>
+    </div>
+    {% endif %}
+
     <div class="notifications-list">
         {% for notif in notifications %}
         <a href="{{ notif.link or '#' }}" class="notification-row {% if not notif.is_read %}unread{% endif %}">
@@ -61,5 +72,63 @@ function markAllRead() {
             }
         });
 }
+
+// --- Push notification toggle ---
+(function () {
+    const card = document.getElementById('pushToggleCard');
+    if (!card || !window.SovereignPush) return;
+
+    const btn = document.getElementById('pushToggleBtn');
+    const status = document.getElementById('pushToggleStatus');
+    const help = document.getElementById('pushToggleHelp');
+
+    async function refresh() {
+        const s = await window.SovereignPush.status();
+        if (s === 'unsupported') {
+            help.textContent = 'This browser does not support push notifications.';
+            btn.disabled = true;
+            btn.textContent = 'Unavailable';
+            status.textContent = 'N/A';
+            card.hidden = false;
+            return;
+        }
+        card.hidden = false;
+        if (s === 'denied') {
+            status.textContent = 'BLOCKED';
+            status.classList.add('denied');
+            help.textContent = 'You blocked notifications in browser settings. Re-enable them there to turn this on.';
+            btn.disabled = true;
+            btn.textContent = 'Blocked';
+        } else if (s === 'enabled') {
+            status.textContent = 'ON';
+            status.classList.add('on');
+            status.classList.remove('denied');
+            btn.textContent = 'Disable';
+            btn.disabled = false;
+        } else {
+            status.textContent = 'OFF';
+            status.classList.remove('on', 'denied');
+            btn.textContent = 'Enable';
+            btn.disabled = false;
+        }
+    }
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+            const s = await window.SovereignPush.status();
+            if (s === 'enabled') {
+                await window.SovereignPush.disable();
+            } else {
+                await window.SovereignPush.enable();
+            }
+        } catch (e) {
+            alert(e.message || 'Could not change notification setting.');
+        }
+        await refresh();
+    });
+
+    refresh();
+})();
 </script>
 {% endblock %}
