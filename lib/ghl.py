@@ -18,6 +18,7 @@ Env vars consumed (all optional — client no-ops if any required var is missing
 import os
 import threading
 import logging
+import time
 from typing import Optional, Iterable
 import requests
 
@@ -94,9 +95,10 @@ def upsert_contact(
     if tags:
         payload["tags"] = tags
     if custom_fields:
-        # GHL accepts customField as a list of {id|key, field_value} pairs.
-        payload["customField"] = [
-            {"key": k, "field_value": "" if v is None else str(v)}
+        # GHL v2 expects `customFields` (plural). Each entry: {id|key, value}.
+        # The legacy `customField` (singular) + `field_value` shape returns 422.
+        payload["customFields"] = [
+            {"key": k, "value": "" if v is None else str(v)}
             for k, v in custom_fields.items()
         ]
 
@@ -130,6 +132,59 @@ def upsert_opportunity(
         return
     # Implementation deferred to Phase 2 — stub for now.
     log.info("ghl.upsert_opportunity stub: %s -> %s", contact_email, stage_tag)
+
+
+def health_check() -> dict:
+    """Synchronous GHL connectivity probe. Returns a structured result so admins
+    can see the actual reason a write would fail (env unset, 401, 422, network).
+
+    Read-only: hits `GET /contacts/?locationId=...&limit=1`. No contacts are
+    created or modified.
+    """
+    api_key = os.environ.get("GHL_API_KEY", "")
+    location_id = os.environ.get("GHL_LOCATION_ID", "")
+    result = {
+        "api_key_set": bool(api_key),
+        "location_id_set": bool(location_id),
+        "enabled": _enabled(),
+        "status_code": None,
+        "latency_ms": None,
+        "ok": False,
+        "error": None,
+        "response_excerpt": None,
+    }
+    if not result["enabled"]:
+        result["error"] = "GHL_API_KEY and/or GHL_LOCATION_ID is unset on this environment."
+        return result
+
+    started = time.monotonic()
+    try:
+        r = requests.get(
+            f"{GHL_BASE}/contacts/",
+            headers=_headers(),
+            params={"locationId": location_id, "limit": 1},
+            timeout=10,
+        )
+        result["latency_ms"] = int((time.monotonic() - started) * 1000)
+        result["status_code"] = r.status_code
+        result["response_excerpt"] = r.text[:300]
+        result["ok"] = r.status_code < 400
+        if not result["ok"]:
+            if r.status_code == 401:
+                result["error"] = "401 Unauthorized — GHL_API_KEY is invalid, expired, or not scoped to this location."
+            elif r.status_code == 403:
+                result["error"] = "403 Forbidden — token lacks contacts.readonly scope for this location."
+            elif r.status_code == 422:
+                result["error"] = "422 Unprocessable — GHL_LOCATION_ID likely doesn't match the token's location."
+            else:
+                result["error"] = f"GHL returned HTTP {r.status_code}."
+    except requests.exceptions.Timeout:
+        result["latency_ms"] = int((time.monotonic() - started) * 1000)
+        result["error"] = "Network timeout after 10s — GHL unreachable from this host."
+    except Exception as e:
+        result["latency_ms"] = int((time.monotonic() - started) * 1000)
+        result["error"] = f"{type(e).__name__}: {e}"
+    return result
 
 
 def custom_fields_from_user(user) -> dict:

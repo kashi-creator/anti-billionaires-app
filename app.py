@@ -2029,6 +2029,17 @@ def admin_comp_month(user_id):
     return redirect(url_for("admin_member_detail", user_id=user.id))
 
 
+@app.route("/admin/ghl/health")
+@admin_required
+def admin_ghl_health():
+    """Surface GHL connectivity status. Production writes fail silently by
+    design (daemon thread + try/except), so this is the on-demand probe."""
+    result = ghl.health_check()
+    if request.args.get("format") == "json":
+        return jsonify(result)
+    return render_template("admin_ghl_health.html", result=result)
+
+
 # ===== THE VAULT (lessons alias) =====
 
 @app.route("/learn")
