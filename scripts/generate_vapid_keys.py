@@ -36,10 +36,15 @@ def main() -> None:
     )
 
     print("# --- Sovereign Society — VAPID keypair ---")
-    print("# Add these to Railway env vars (Production) and your local .env")
+    print("# Paste each line into Railway → Variables. Save in 1Password too.")
+    print("#")
+    print("# !! DO NOT paste the PRIVATE key back into chat, Slack, email, or")
+    print("#    any AI assistant. It controls every push notification this app")
+    print("#    can ever send. If exposed, re-run this script (rotates keys)")
+    print("#    and update Railway — every existing subscription will break.")
     print()
     print(f"VAPID_PUBLIC_KEY={b64url(public_bytes)}")
-    print(f"VAPID_PRIVATE_KEY={b64url(private_bytes)}")
+    print(f"VAPID_PRIVATE_KEY={b64url(private_bytes)}    # SECRET — DO NOT SHARE")
     print("VAPID_CLAIM_EMAIL=mailto:kashi@thebreathcoachschool.com")
 
 
