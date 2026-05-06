@@ -170,16 +170,28 @@
   const errEl = document.getElementById('asError');
   let currentIdx = 0;
 
-  // Wire radio button selected state + enable Continue
-  document.querySelectorAll('.as-radio input').forEach(input => {
-    input.addEventListener('change', e => {
-      const radio = e.target;
-      const slug = radio.dataset.pillar;
-      const qIdx = radio.dataset.qindex;
-      // Clear .selected from same-question radios
+  // Wire radio selection on the LABEL, not the input.
+  // iOS Safari intermittently fails to deliver `change` events from
+  // hidden inputs inside labels (especially with pointer-events:none),
+  // so the user can tap 1-5 and nothing happens. Binding to the label's
+  // own click avoids relying on label→input click propagation entirely.
+  document.querySelectorAll('.as-radio').forEach(label => {
+    label.addEventListener('click', e => {
+      const input = label.querySelector('input[type="radio"]');
+      if (!input) return;
+      // Prevent the default label→input click chain from firing twice
+      e.preventDefault();
+      const slug = input.dataset.pillar;
+      const qIdx = input.dataset.qindex;
+      // Clear sibling selections + uncheck their inputs
       document.querySelectorAll(`.as-radio input[data-pillar="${slug}"][data-qindex="${qIdx}"]`)
-        .forEach(r => r.parentElement.classList.remove('selected'));
-      radio.parentElement.classList.add('selected');
+        .forEach(r => {
+          r.checked = false;
+          r.parentElement.classList.remove('selected');
+        });
+      // Mark this one
+      input.checked = true;
+      label.classList.add('selected');
       updateContinueState();
     });
   });
