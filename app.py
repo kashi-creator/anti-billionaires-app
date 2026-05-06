@@ -638,6 +638,25 @@ def push_unsubscribe():
     return jsonify({"success": True})
 
 
+@app.route("/push/test", methods=["POST"])
+@login_required
+def push_test():
+    """Self-send a push to verify end-to-end delivery. No-ops cleanly when
+    push isn't configured so the user sees a clear error instead of silence."""
+    if not push_lib.push_configured():
+        return jsonify({"success": False, "error": "Push not configured on the server."}), 400
+    from models import PushSubscription
+    if not PushSubscription.query.filter_by(user_id=current_user.id).count():
+        return jsonify({"success": False, "error": "No push subscription on file. Tap Enable first."}), 400
+    push_lib.send_push_to_user(
+        current_user.id,
+        "Sovereign",
+        "Push notifications are working. You're set.",
+        "/notifications",
+    )
+    return jsonify({"success": True})
+
+
 @app.route("/api/devices/register", methods=["POST"])
 @login_required
 def register_device():

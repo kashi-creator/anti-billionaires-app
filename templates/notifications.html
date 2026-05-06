@@ -17,6 +17,7 @@
             <p id="pushToggleHelp">Get alerts on your phone or desktop when someone reaches out, reacts, or invites you.</p>
         </div>
         <span class="push-toggle-status" id="pushToggleStatus">OFF</span>
+        <button class="btn btn-outline btn-sm" id="pushTestBtn" type="button" hidden>Send Test</button>
         <button class="btn btn-gold btn-sm" id="pushToggleBtn" type="button">Enable</button>
     </div>
     {% endif %}
@@ -79,8 +80,10 @@ function markAllRead() {
     if (!card || !window.SovereignPush) return;
 
     const btn = document.getElementById('pushToggleBtn');
+    const testBtn = document.getElementById('pushTestBtn');
     const status = document.getElementById('pushToggleStatus');
     const help = document.getElementById('pushToggleHelp');
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
     async function refresh() {
         const s = await window.SovereignPush.status();
@@ -89,6 +92,7 @@ function markAllRead() {
             btn.disabled = true;
             btn.textContent = 'Unavailable';
             status.textContent = 'N/A';
+            testBtn.hidden = true;
             card.hidden = false;
             return;
         }
@@ -99,17 +103,20 @@ function markAllRead() {
             help.textContent = 'You blocked notifications in browser settings. Re-enable them there to turn this on.';
             btn.disabled = true;
             btn.textContent = 'Blocked';
+            testBtn.hidden = true;
         } else if (s === 'enabled') {
             status.textContent = 'ON';
             status.classList.add('on');
             status.classList.remove('denied');
             btn.textContent = 'Disable';
             btn.disabled = false;
+            testBtn.hidden = false;
         } else {
             status.textContent = 'OFF';
             status.classList.remove('on', 'denied');
             btn.textContent = 'Enable';
             btn.disabled = false;
+            testBtn.hidden = true;
         }
     }
 
@@ -126,6 +133,27 @@ function markAllRead() {
             alert(e.message || 'Could not change notification setting.');
         }
         await refresh();
+    });
+
+    testBtn.addEventListener('click', async () => {
+        testBtn.disabled = true;
+        const original = testBtn.textContent;
+        testBtn.textContent = 'Sending…';
+        try {
+            const res = await fetch('/push/test', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.error || 'Test failed.');
+            testBtn.textContent = 'Sent ✓';
+            setTimeout(() => { testBtn.textContent = original; testBtn.disabled = false; }, 2500);
+        } catch (e) {
+            alert(e.message || 'Test push failed.');
+            testBtn.textContent = original;
+            testBtn.disabled = false;
+        }
     });
 
     refresh();
