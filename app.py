@@ -638,6 +638,26 @@ def push_unsubscribe():
     return jsonify({"success": True})
 
 
+@app.route("/push/debug")
+@login_required
+def push_debug():
+    """Quick diagnostic — surfaces server-side push state for the current user
+    so we don't have to guess what's broken from the frontend."""
+    from models import PushSubscription
+    pk = push_lib.vapid_public_key()
+    subs = PushSubscription.query.filter_by(user_id=current_user.id).all()
+    return jsonify({
+        "push_configured": push_lib.push_configured(),
+        "vapid_public_key_present": bool(pk),
+        "vapid_public_key_first16": pk[:16] if pk else None,
+        "vapid_claim_email_set": bool(os.environ.get("VAPID_CLAIM_EMAIL")),
+        "subscriptions_for_this_user": len(subs),
+        "subscription_endpoints_first40": [s.endpoint[:40] + "..." for s in subs],
+        "user_agent": request.headers.get("User-Agent", "")[:200],
+        "is_https": request.is_secure,
+    })
+
+
 @app.route("/push/test", methods=["POST"])
 @login_required
 def push_test():

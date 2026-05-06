@@ -75,9 +75,24 @@ function markAllRead() {
 }
 
 // --- Push notification toggle ---
-(function () {
+// Wait for DOMContentLoaded so that the deferred pwa.js (which exposes
+// window.SovereignPush) has executed. Inline scripts otherwise run BEFORE
+// defer scripts, so without this wait the IIFE silently returns early
+// and the Enable button does nothing.
+document.addEventListener('DOMContentLoaded', function () {
     const card = document.getElementById('pushToggleCard');
-    if (!card || !window.SovereignPush) return;
+    if (!card) return;
+    if (!window.SovereignPush) {
+        // Fallback: pwa.js failed to load. Make the button explicit instead of dead.
+        const help = document.getElementById('pushToggleHelp');
+        const btn = document.getElementById('pushToggleBtn');
+        const status = document.getElementById('pushToggleStatus');
+        if (help) help.textContent = 'Push library failed to load. Hard-refresh the page (close and reopen the app).';
+        if (status) status.textContent = 'ERROR';
+        if (btn) { btn.disabled = true; btn.textContent = 'Reload'; btn.addEventListener('click', () => location.reload()); }
+        card.hidden = false;
+        return;
+    }
 
     const btn = document.getElementById('pushToggleBtn');
     const testBtn = document.getElementById('pushTestBtn');
@@ -157,6 +172,6 @@ function markAllRead() {
     });
 
     refresh();
-})();
+});
 </script>
 {% endblock %}
