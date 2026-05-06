@@ -63,6 +63,10 @@ img { max-width: 100%; height: auto; }
     background: rgba(8, 8, 8, 0.95);
     backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border);
+    /* iOS PWA standalone: status bar / Dynamic Island overlap. Push the
+       nav contents below the safe area. Zero in browsers / non-notched
+       devices, ~47-59px on iPhones with Dynamic Island. */
+    padding-top: env(safe-area-inset-top);
 }
 
 .nav-container {
@@ -216,12 +220,14 @@ body.menu-open { overflow: hidden; }
 .main-content {
     max-width: 960px;
     margin: 0 auto;
-    padding: 100px 1.5rem 3rem;
+    /* Top padding compensates for the fixed navbar (72px) + iOS safe-area top
+       so content never sits under the status bar in installed PWA mode. */
+    padding: calc(100px + env(safe-area-inset-top)) 1.5rem 3rem;
 }
 
 /* No fixed nav for anonymous users — kill the dead top-padding.
    Applies at ALL viewport widths since there's no nav to clear at any size. */
-body.no-nav .main-content { padding-top: 0.5rem !important; padding-left: 1rem; padding-right: 1rem; }
+body.no-nav .main-content { padding-top: calc(0.5rem + env(safe-area-inset-top)) !important; padding-left: 1rem; padding-right: 1rem; }
 body.no-nav .pricing-container { padding-top: 0 !important; }
 body.no-nav .pricing-header { margin-bottom: 1rem !important; }
 body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
@@ -2076,8 +2082,8 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
 
 /* ============ RESPONSIVE ============ */
 @media (max-width: 600px) {
-    .main-content { padding-top: 80px; }
-    body.no-nav .main-content { padding-top: 0.25rem; padding-left: 1rem; padding-right: 1rem; }
+    .main-content { padding-top: calc(80px + env(safe-area-inset-top)); }
+    body.no-nav .main-content { padding-top: calc(0.25rem + env(safe-area-inset-top)); padding-left: 1rem; padding-right: 1rem; }
     .auth-card { padding: 2.5rem 1.75rem; }
     .auth-logo { font-size: 2.2rem; }
     .feed-header h1 { font-size: 1.6rem; }
