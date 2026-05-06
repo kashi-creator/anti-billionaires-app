@@ -66,12 +66,16 @@ img { max-width: 100%; height: auto; }
 }
 
 .nav-container {
-    max-width: 960px;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 2rem;
+    gap: 1rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(2.25rem, calc(1.5rem + env(safe-area-inset-right)));
     height: 72px;
 }
 
@@ -80,7 +84,11 @@ img { max-width: 100%; height: auto; }
     align-items: center;
     gap: 1rem;
     color: var(--text);
+    flex-shrink: 0;
 }
+
+.nav-logo .logo-text,
+.nav-logo .logo-tagline { white-space: nowrap; }
 
 .logo-text {
     font-family: 'Cormorant Garamond', Georgia, serif;
@@ -113,10 +121,12 @@ img { max-width: 100%; height: auto; }
 .nav-links {
     display: none;
     align-items: center;
-    gap: 0.15rem;
+    gap: 0.1rem;
+    flex-wrap: nowrap;
+    min-width: 0;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 1100px) {
     .nav-links { display: flex; }
     .mobile-menu-btn { display: none !important; }
 }
@@ -124,21 +134,23 @@ img { max-width: 100%; height: auto; }
 .nav-link {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.6rem 0.85rem;
+    gap: 0.4rem;
+    padding: 0.5rem 0.6rem;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 400;
     letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: var(--transition);
 }
 
 .nav-link:hover { color: var(--gold); background: var(--gold-glow); }
 .nav-link.active { color: var(--gold); }
 .nav-link.disabled { opacity: 0.3; pointer-events: none; }
-.nav-link span { display: none; }
-@media (min-width: 768px) { .nav-link span { display: inline; } }
+.nav-link span { display: none; white-space: nowrap; }
+@media (min-width: 1100px) { .nav-link span { display: inline; } }
 
 .nav-avatar {
     width: 34px;
@@ -1554,7 +1566,9 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0 0.5rem;
+    padding: 0 0.4rem;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .nav-streak-badge {
@@ -1573,6 +1587,7 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
 .nav-notif-container,
 .nav-avatar-container {
     position: relative;
+    flex-shrink: 0;
 }
 
 .nav-notif-btn,
@@ -1580,7 +1595,7 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.5rem 0.75rem;
+    padding: 0.4rem 0.5rem;
     border-radius: var(--radius);
     color: var(--text-muted);
     transition: var(--transition);
@@ -1726,8 +1741,10 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
 /* ============ UPGRADE BUTTON ============ */
 .nav-upgrade-btn {
     font-size: 0.65rem !important;
-    padding: 0.35rem 0.85rem !important;
+    padding: 0.35rem 0.75rem !important;
     letter-spacing: 0.12em;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .mobile-upgrade {

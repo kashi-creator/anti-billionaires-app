@@ -93,9 +93,9 @@ CANONICAL_SPACE_NAMES = [
     "Sovereign Wealth",
     "Body & Iron",
     "Awake Minds",
-    "Brotherhood Ops",
+    "Business Directory",
     "The Arsenal",
-    "Red Pill Intel",
+    "The Hidden Truth",
     "Family & Legacy",
     "Off Grid",
 ]
@@ -104,9 +104,9 @@ SPACE_SLUG = {
     "Sovereign Wealth": "sovereign-wealth",
     "Body & Iron": "body-iron",
     "Awake Minds": "awake-minds",
-    "Brotherhood Ops": "brotherhood-ops",
+    "Business Directory": "business-directory",
     "The Arsenal": "arsenal",
-    "Red Pill Intel": "red-pill-intel",
+    "The Hidden Truth": "the-hidden-truth",
     "Family & Legacy": "family-legacy",
     "Off Grid": "off-grid",
 }
@@ -363,8 +363,8 @@ Three — the WHO updated pandemic-treaty language to include cross-border lockd
 
 I'm not going to tell you what to think about any of this. I am going to tell you that if your news diet did not surface a single one of these three, your news diet is broken. I'll drop the source links in comments. Read the primaries."""),
 
-    # ---------------- Brotherhood Ops ----------------
-    ("Brotherhood Ops", "marcus-w",
+    # ---------------- Business Directory ----------------
+    ("Business Directory", "marcus-w",
      "How we ran a 6-man retreat without a coach or agenda",
      """Six of us — three from Texas, two from Florida, one from Idaho — rented a cabin north of Sedona for four days last month. No coach. No agenda. No trained facilitator.
 
@@ -380,7 +380,7 @@ Day four: lifts, food, drive home.
 
 Nothing got done by accident. The structure did the work. Happy to share the schedule for any room that wants to run their own."""),
 
-    ("Brotherhood Ops", "chase-w",
+    ("Business Directory", "chase-w",
      "Operator stack: the 5 tools I run my businesses on after killing 23 SaaS subscriptions",
      """Did a SaaS audit at the start of the year. Twenty-three active subscriptions across the three businesses. Almost all of them duplicated functionality I could get from one well-chosen tool. Killed eighteen of them. Annual savings: just under $14k. More importantly: cognitive savings.
 
@@ -429,8 +429,8 @@ Open rates are higher than the SaaS tools because I am not blasting from a share
 
 It is not a product. It is a tool I run for one business. If anyone wants the code as a starting point — happy to send. Stop renting things you can own."""),
 
-    # ---------------- Red Pill Intel ----------------
-    ("Red Pill Intel", "kyle-h",
+    # ---------------- The Hidden Truth ----------------
+    ("The Hidden Truth", "kyle-h",
      "Excess mortality 2020-2024 — the chart they didn't show you",
      """Pulled the CDC's own all-cause mortality data for 2020 through 2024 and reorganized it the way it should have been published the first time: by age cohort, normalized against pre-pandemic five-year averages, segmented by year-quarter rather than annualized.
 
@@ -440,7 +440,7 @@ I am not going to tell you what caused it. I do not know. The point of the post 
 
 Methodology in the comments. Replication-ready Python notebook for anyone who wants to run their own segmentation. Post your version. Argue with mine. That is how the room works."""),
 
-    ("Red Pill Intel", "david-k",
+    ("The Hidden Truth", "david-k",
      "Why I stopped reading mainstream economic forecasts",
      """Stopped reading the IMF and World Bank annual outlooks about three years ago. Started reading them again last quarter as a control experiment. The findings:
 

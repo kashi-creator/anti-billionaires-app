@@ -1305,15 +1305,28 @@ def member_map():
 @features.route('/profile/location', methods=['POST'])
 @login_required
 def update_location():
+    from lib.geocoding import geocode_city
     current_user.city = request.form.get("city", "").strip() or None
     current_user.country = request.form.get("country", "").strip() or None
     lat = request.form.get("lat", "")
     lng = request.form.get("lng", "")
+    coords_provided = False
     try:
-        current_user.lat = float(lat) if lat else None
-        current_user.lng = float(lng) if lng else None
+        if lat and lng:
+            current_user.lat = float(lat)
+            current_user.lng = float(lng)
+            coords_provided = True
     except ValueError:
         pass
+    # If the user typed a city but didn't supply coords, resolve them so the
+    # member shows up in Find Brothers search/proximity. Silent on failure —
+    # the row still saves, just without coords.
+    if not coords_provided and current_user.city:
+        q = ", ".join(p for p in (current_user.city, current_user.country) if p)
+        hit = geocode_city(q)
+        if hit:
+            current_user.lat = hit["lat"]
+            current_user.lng = hit["lng"]
     current_user.show_on_map = request.form.get("show_on_map") == "on"
     db.session.commit()
     flash("Location updated.", "success")
@@ -1340,6 +1353,35 @@ def update_location_visibility():
 #  FIND BROTHERS — search by city + proximity (Phase 6)
 # =====================================================================
 
+# Per-user rate limit on the geocoding endpoint. Nominatim's policy is ~1 req/sec
+# globally; lru_cache absorbs repeats but a logged-in user could still hammer
+# fresh queries. In-memory deque per user_id is sufficient for single-process
+# Railway deploys.
+from collections import deque
+import time as _time
+_FIND_SEARCH_HITS = {}  # user_id -> deque[timestamps]
+_FIND_SEARCH_WINDOW_S = 60
+_FIND_SEARCH_MAX_PER_WINDOW = 20
+
+# Bounding-box queries (state/country/etc.) can return huge member lists; cap
+# the response so the JSON stays bounded.
+_FIND_BBOX_RESULT_CAP = 200
+# Sanity cap on /find/nearby — without this, the "20 closest" can include
+# someone on another continent in a sparse region.
+_FIND_NEARBY_MAX_MILES = 100
+
+
+def _find_search_rate_ok(user_id):
+    now = _time.monotonic()
+    hits = _FIND_SEARCH_HITS.setdefault(user_id, deque())
+    while hits and now - hits[0] > _FIND_SEARCH_WINDOW_S:
+        hits.popleft()
+    if len(hits) >= _FIND_SEARCH_MAX_PER_WINDOW:
+        return False
+    hits.append(now)
+    return True
+
+
 @features.route('/find')
 @login_required
 def find_brothers():
@@ -1358,7 +1400,9 @@ def find_brothers():
 def find_search():
     if not current_user.has_active_subscription:
         return jsonify({"error": "membership required"}), 403
-    from lib.geocoding import geocode_city, haversine_miles
+    if not _find_search_rate_ok(current_user.id):
+        return jsonify({"error": "slow down — too many searches, try again in a minute"}), 429
+    from lib.geocoding import geocode_city, haversine_miles, in_bbox
     data = request.get_json(silent=True) or {}
     city = (data.get("city") or "").strip()
     try:
@@ -1368,10 +1412,13 @@ def find_search():
     radius = max(1, min(radius, 500))
     if not city:
         return jsonify({"error": "city required"}), 400
-    coords = geocode_city(city)
-    if not coords:
+    hit = geocode_city(city)
+    if not hit:
         return jsonify({"error": "could not locate that city"}), 400
-    target_lat, target_lng = coords
+    target_lat, target_lng = hit["lat"], hit["lng"]
+    # State/country/region queries: filter by bounding box instead of radius.
+    # Nominatim sets class=='boundary' for administrative regions.
+    use_bbox = hit.get("osm_class") == "boundary" and hit.get("bbox")
     candidates = User.query.filter(
         User.location_visibility != "hidden",
         User.lat.isnot(None),
@@ -1382,19 +1429,27 @@ def find_search():
         if u.id == current_user.id:
             continue
         d = haversine_miles(target_lat, target_lng, u.lat, u.lng)
-        if d <= radius:
-            results.append({
-                "id": u.id,
-                "name": u.name,
-                "city": u.city or "",
-                "country": u.country or "",
-                "miles": round(d, 1),
-                "profile_photo": u.profile_photo,
-            })
+        if use_bbox:
+            if not in_bbox(u.lat, u.lng, hit["bbox"]):
+                continue
+        else:
+            if d > radius:
+                continue
+        results.append({
+            "id": u.id,
+            "name": u.name,
+            "city": u.city or "",
+            "country": u.country or "",
+            "miles": round(d, 1),
+            "profile_photo": u.profile_photo,
+        })
     results.sort(key=lambda x: x["miles"])
+    if use_bbox:
+        results = results[:_FIND_BBOX_RESULT_CAP]
     return jsonify({
         "results": results,
         "center": {"lat": target_lat, "lng": target_lng, "city": city},
+        "mode": "region" if use_bbox else "radius",
     })
 
 
@@ -1420,6 +1475,8 @@ def find_nearby():
         if u.id == current_user.id:
             continue
         d = haversine_miles(lat, lng, u.lat, u.lng)
+        if d > _FIND_NEARBY_MAX_MILES:
+            continue
         results.append({
             "id": u.id,
             "name": u.name,

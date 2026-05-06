@@ -61,9 +61,9 @@ instance/           # SQLite database
 1. Sovereign Wealth — capital allocation, macro, deal flow
 2. Body & Iron — strength, training, discipline
 3. Awake Minds — sovereignty, awakening, contrarian thought
-4. Brotherhood Ops — operations, getting things done together
+4. Business Directory — supporting each other's businesses, referrals, accountability
 5. The Arsenal — tools, systems, builders' workshop
-6. Red Pill Intel — information, signal vs noise
+6. The Hidden Truth — information, signal vs noise
 7. Family & Legacy — fatherhood, generations, building for sons
 8. Off Grid — physical sovereignty, land, security
 

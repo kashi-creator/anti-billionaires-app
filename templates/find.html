@@ -156,11 +156,12 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  function renderResults(container, results, emptyMsg) {
+  function renderResults(container, results, emptyMsg, opts) {
     if (!results.length) {
       container.innerHTML = '<div class="find-empty">' + emptyMsg + '</div>';
       return;
     }
+    const showDistance = !(opts && opts.hideDistance);
     container.innerHTML = results.map(r => {
       const loc = [r.city, r.country].filter(Boolean).join(', ');
       return '<a class="find-result" href="/profile/' + r.id + '">'
@@ -169,7 +170,7 @@
         +   '<div class="find-result-name">' + escapeHtml(r.name) + '</div>'
         +   '<div class="find-result-meta">' + escapeHtml(loc) + '</div>'
         + '</div>'
-        + '<div class="find-result-distance">' + r.miles + ' mi</div>'
+        + (showDistance ? '<div class="find-result-distance">' + r.miles + ' mi</div>' : '')
         + '</a>';
     }).join('');
   }
@@ -202,10 +203,15 @@
           return;
         }
         const c = body.center;
+        const isRegion = body.mode === 'region';
+        const emptyMsg = isRegion
+          ? 'No brothers found in ' + escapeHtml(c.city) + '.'
+          : 'No brothers found within ' + radius + ' mi of ' + escapeHtml(c.city) + '.';
         renderResults(
           searchResults,
           body.results || [],
-          'No brothers found within ' + radius + ' mi of ' + escapeHtml(c.city) + '.'
+          emptyMsg,
+          { hideDistance: isRegion }
         );
       })
       .catch(() => {
