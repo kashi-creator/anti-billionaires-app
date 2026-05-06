@@ -550,11 +550,12 @@ with app.app_context():
 @app.route("/")
 def index():
     if current_user.is_authenticated and current_user.has_active_subscription:
-        if not current_user.onboarding_complete:
-            return redirect(url_for("onboarding"))
-        return redirect(url_for("feed"))
+        # _post_signup_redirect handles the full funnel including the install
+        # hard-step. The before_request guard catches this earlier for paying
+        # users who haven't acknowledged install, but we keep it here as a
+        # belt-and-suspenders for the assessment/onboarding tail.
+        return _post_signup_redirect(current_user)
     if current_user.is_authenticated:
-        # Authenticated but no membership: send to pricing.
         return redirect(url_for("pricing"))
     return render_template("landing.html")
 
@@ -759,9 +760,11 @@ def manifesto():
 def _post_signup_redirect(user):
     """Where to send a freshly-signed-up user.
 
-    Flow: assessment (40q) → onboarding (5 steps) → feed.
+    Flow: install (PWA hard-step) → assessment (40q) → onboarding (5 steps) → feed.
     Returns a Flask redirect Response.
     """
+    if not getattr(user, "install_acknowledged_at", None):
+        return redirect(url_for("welcome_install"))
     if not getattr(user, "assessment_complete", False):
         return redirect(url_for("assessment"))
     if not getattr(user, "onboarding_complete", False):
@@ -771,11 +774,76 @@ def _post_signup_redirect(user):
 
 def _post_signup_redirect_url(user):
     """URL-string variant for JSON callers (e.g. /signup-with-code)."""
+    if not getattr(user, "install_acknowledged_at", None):
+        return url_for("welcome_install")
     if not getattr(user, "assessment_complete", False):
         return url_for("assessment")
     if not getattr(user, "onboarding_complete", False):
         return url_for("onboarding")
     return url_for("feed")
+
+
+# Endpoints allowed for paying users who haven't yet acknowledged the
+# PWA install step. Any other request from such users is redirected to
+# /welcome/install so they can't bypass the hard step by URL-typing.
+_PRE_INSTALL_ALLOWED_ENDPOINTS = {
+    "welcome_install",
+    "welcome_install_complete",
+    "logout",
+    "static",
+    "service_worker",
+    "offline_page",
+    "billing_portal",  # let them manage billing if they need to
+}
+
+
+@app.before_request
+def _enforce_pwa_install_step():
+    """Hard-step gate: paying users must acknowledge the PWA install step
+    before accessing any other page. One-time per user, set when they tap
+    "I've installed it" or auto-detected via display-mode standalone."""
+    if not current_user.is_authenticated:
+        return None
+    if not current_user.has_active_subscription:
+        return None
+    if getattr(current_user, "install_acknowledged_at", None) is not None:
+        return None
+    if request.endpoint in _PRE_INSTALL_ALLOWED_ENDPOINTS:
+        return None
+    if request.path.startswith("/static/"):
+        return None
+    # AJAX/JSON callers: return JSON pointing at the gate so client JS can navigate.
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"redirect": url_for("welcome_install")}), 409
+    return redirect(url_for("welcome_install"))
+
+
+@app.route("/welcome/install", methods=["GET"])
+@login_required
+def welcome_install():
+    """The hard-step page shown post-payment. Renders without navbar so the
+    user can't navigate away. Detects platform client-side and surfaces the
+    appropriate install path."""
+    if not current_user.has_active_subscription:
+        return redirect(url_for("pricing"))
+    if current_user.install_acknowledged_at:
+        return _post_signup_redirect(current_user)
+    return render_template("welcome_install.html")
+
+
+@app.route("/welcome/install/complete", methods=["POST"])
+@login_required
+@require_csrf
+def welcome_install_complete():
+    """User confirms they've installed the app (or device truly cannot install).
+    Marks the gate as passed and redirects them onward through the funnel."""
+    if not current_user.has_active_subscription:
+        return jsonify({"success": False, "error": "Subscription required"}), 403
+    if not current_user.install_acknowledged_at:
+        current_user.install_acknowledged_at = datetime.utcnow()
+        db.session.commit()
+    next_url = _post_signup_redirect_url(current_user)
+    return jsonify({"success": True, "next": next_url})
 
 
 @app.route("/assessment", methods=["GET"])

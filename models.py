@@ -75,6 +75,11 @@ class User(UserMixin, db.Model):
     # Self-Assessment (Phase 5) — runs BEFORE onboarding on first signup
     assessment_complete = db.Column(db.Boolean, default=False, nullable=False)
 
+    # PWA install hard-step (Phase 9) — shown once after payment,
+    # blocks access to all other pages until acknowledged. Set when the
+    # user clicks "I've installed" or detected via display-mode standalone.
+    install_acknowledged_at = db.Column(db.DateTime, default=None)
+
     # Email throttling (Phase 8) — last time we sent any engagement email to this user
     last_engagement_email_at = db.Column(db.DateTime, default=None)
     last_digest_sent_at = db.Column(db.DateTime, default=None)
