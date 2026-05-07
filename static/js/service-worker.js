@@ -5,7 +5,7 @@
 // Bump CACHE_VERSION whenever you ship breaking SW changes so old clients
 // upgrade cleanly on next visit.
 
-const CACHE_VERSION = 'sovereign-v2';
+const CACHE_VERSION = 'sovereign-v3';
 const OFFLINE_URL = '/offline';
 const PRECACHE_ASSETS = [
   '/static/css/style.css',

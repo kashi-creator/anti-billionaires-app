@@ -192,8 +192,10 @@ img { max-width: 100%; height: auto; }
 
 .mobile-menu.open {
     display: flex;
-    max-height: calc(100vh - 72px);
-    max-height: calc(100dvh - 72px);
+    /* Subtract navbar height (72px) AND the iOS status bar / Dynamic Island
+       inset so the menu fits under the taller-on-iOS-PWA navbar. */
+    max-height: calc(100vh - 72px - env(safe-area-inset-top));
+    max-height: calc(100dvh - 72px - env(safe-area-inset-top));
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -2107,6 +2109,9 @@ body.no-nav .pricing-header h1 { margin-bottom: 0.4rem !important; }
     .nav-points-wrap { display: none; }
     .mobile-tab-bar { display: flex; }
     .main-content { padding-bottom: 90px; }
+    /* Reserve space at end of mobile dropdown so the last item (Logout)
+       isn't covered by the fixed bottom tab bar + iOS home indicator. */
+    .mobile-menu.open { padding-bottom: calc(1.5rem + 84px + env(safe-area-inset-bottom)); }
     .boardroom-layout { flex-direction: column; }
     .boardroom-sidebar { order: -1; }
     .deals-grid { grid-template-columns: 1fr; }
