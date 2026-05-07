@@ -228,4 +228,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (checklistComplete) {
         setTimeout(launchConfetti, 500);
     }
+
+    // Auto-grow post composer textareas so typed content stays visible.
+    document.querySelectorAll('.post-composer textarea').forEach((ta) => {
+        const grow = () => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        };
+        ta.addEventListener('input', grow);
+        ta.style.overflowY = 'hidden';
+        grow();
+    });
 });
