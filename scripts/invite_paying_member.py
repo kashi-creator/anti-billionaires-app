@@ -88,13 +88,17 @@ def invite_paying_member(email, name, phone=None, company=None):
         if phone:
             print(f"  phone: {phone}")
 
-        host = "https://anti-billionaires-app-production.up.railway.app"
+        host = "https://" + os.environ.get(
+            "SERVER_NAME", "anti-billionaires-app-production.up.railway.app"
+        )
         reset_link = f"{host}/reset-password/{user.password_reset_token}"
         print(f"Reset link (valid 7 days): {reset_link}")
 
         try:
-            send_password_reset(user, reset_link)
-            print("Password-reset email dispatched")
+            sent = send_password_reset(user, reset_link, async_=False)
+            print(f"Password-reset email send result: {sent}")
+            if not sent:
+                print(f"DM the reset link above to {email}")
         except Exception as e:
             print(f"WARN: send_password_reset failed: {e}")
             print(f"DM the reset link above to {email}")

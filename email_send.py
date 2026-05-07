@@ -86,12 +86,13 @@ def send_welcome_verify(user, verify_url):
     )
 
 
-def send_password_reset(user, reset_url):
+def send_password_reset(user, reset_url, async_=True):
     return send_email(
         to=user.email,
         subject="Reset your password",
         template="password_reset",
         context={"user": user, "reset_url": reset_url},
+        async_=async_,
     )
 
 
