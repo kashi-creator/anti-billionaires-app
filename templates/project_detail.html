@@ -141,7 +141,7 @@
   <div class="pd-card">
     <div class="pd-cover">
       {% if project.cover_image %}
-      <img src="{{ url_for('static', filename=project.cover_image) }}" alt="">
+      <img src="{{ asset_url(project.cover_image) }}" alt="">
       {% else %}
       <span class="pd-cover-fallback">{{ project.title[0]|upper }}</span>
       {% endif %}
@@ -166,7 +166,7 @@
       <div class="pd-creator-row">
         <div class="pd-avatar" style="width:36px;height:36px;border-radius:50%;background:#D4AF37;color:#0a0a0a;display:flex;align-items:center;justify-content:center;font-weight:600;overflow:hidden;">
           {% if project.creator.profile_photo %}
-          <img src="{{ url_for('static', filename=project.creator.profile_photo) }}" alt="" style="width:100%;height:100%;object-fit:cover;">
+          <img src="{{ asset_url(project.creator.profile_photo) }}" alt="" style="width:100%;height:100%;object-fit:cover;">
           {% else %}
           {{ project.creator.name[0]|upper }}
           {% endif %}
@@ -206,7 +206,7 @@
       <a href="{{ url_for('profile', user_id=interest.user.id) }}" class="pd-interest-chip">
         <span class="pd-avatar">
           {% if interest.user.profile_photo %}
-          <img src="{{ url_for('static', filename=interest.user.profile_photo) }}" alt="">
+          <img src="{{ asset_url(interest.user.profile_photo) }}" alt="">
           {% else %}
           {{ interest.user.name[0]|upper }}
           {% endif %}
@@ -238,7 +238,7 @@
       <div class="pd-update-meta">{{ update.time_ago }}</div>
       <div class="pd-update-content">{{ update.content }}</div>
       {% if update.image_path %}
-      <img src="{{ url_for('static', filename=update.image_path) }}" alt="">
+      <img src="{{ asset_url(update.image_path) }}" alt="">
       {% endif %}
     </div>
     {% else %}

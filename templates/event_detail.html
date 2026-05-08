@@ -10,7 +10,7 @@
 
     {% if event.cover_image %}
     <div class="event-detail-cover">
-        <img src="{{ url_for('static', filename=event.cover_image) }}" alt="">
+        <img src="{{ asset_url(event.cover_image) }}" alt="">
     </div>
     {% endif %}
 
@@ -104,7 +104,7 @@
                 {% for u in going_users[:12] %}
                 <a href="{{ url_for('profile', user_id=u.id) }}" class="avatar avatar-sm" title="{{ u.name }}">
                     {% if u.profile_photo %}
-                    <img src="{{ url_for('static', filename=u.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(u.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ u.name[0]|upper }}</span>
                     {% endif %}
@@ -124,7 +124,7 @@
                 {% for u in interested_users[:12] %}
                 <a href="{{ url_for('profile', user_id=u.id) }}" class="avatar avatar-sm" title="{{ u.name }}">
                     {% if u.profile_photo %}
-                    <img src="{{ url_for('static', filename=u.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(u.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ u.name[0]|upper }}</span>
                     {% endif %}

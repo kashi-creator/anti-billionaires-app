@@ -7,7 +7,7 @@
     <div class="card" style="margin-top:1rem">
         {% if deal.image_path %}
         <div class="deal-detail-img">
-            <img src="{{ url_for('static', filename=deal.image_path) }}" alt="">
+            <img src="{{ asset_url(deal.image_path) }}" alt="">
         </div>
         {% endif %}
         <span class="deal-category">{{ deal.category|capitalize }}</span>
@@ -16,7 +16,7 @@
             <a href="{{ url_for('profile', user_id=deal.author.id) }}" class="post-author">
                 <div class="avatar avatar-sm">
                     {% if deal.author.profile_photo %}
-                    <img src="{{ url_for('static', filename=deal.author.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(deal.author.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ deal.author.name[0]|upper }}</span>
                     {% endif %}
@@ -44,7 +44,7 @@
             <div class="convo-card" style="margin-bottom:0.5rem">
                 <div class="avatar avatar-sm">
                     {% if interest.user.profile_photo %}
-                    <img src="{{ url_for('static', filename=interest.user.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(interest.user.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ interest.user.name[0]|upper }}</span>
                     {% endif %}

@@ -8,7 +8,7 @@
         <div class="booking-host">
             <div class="avatar avatar-lg">
                 {% if host.profile_photo %}
-                <img src="{{ url_for('static', filename=host.profile_photo) }}" alt="">
+                <img src="{{ asset_url(host.profile_photo) }}" alt="">
                 {% else %}
                 <span>{{ host.name[0]|upper }}</span>
                 {% endif %}

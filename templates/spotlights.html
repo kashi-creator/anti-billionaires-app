@@ -19,7 +19,7 @@
             <div class="spotlight-rank">#{{ loop.index }}</div>
             <div class="avatar avatar-lg" style="margin:0 auto 1rem">
                 {% if member.profile_photo %}
-                <img src="{{ url_for('static', filename=member.profile_photo) }}" alt="">
+                <img src="{{ asset_url(member.profile_photo) }}" alt="">
                 {% else %}
                 <span>{{ member.name[0]|upper }}</span>
                 {% endif %}

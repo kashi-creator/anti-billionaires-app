@@ -94,7 +94,7 @@
     <div class="pf-row">
       <label>Cover image</label>
       {% if project.cover_image %}
-      <img src="{{ url_for('static', filename=project.cover_image) }}" alt="" class="project-form-cover-current">
+      <img src="{{ asset_url(project.cover_image) }}" alt="" class="project-form-cover-current">
       <span class="pf-hint">Upload a new image to replace the current cover, or leave blank to keep it.</span>
       {% endif %}
       <input type="file" name="cover_image" accept="image/*">

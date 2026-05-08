@@ -21,7 +21,7 @@
         <a href="{{ url_for('features.deal_detail', deal_id=deal.id) }}" class="card deal-card">
             {% if deal.image_path %}
             <div class="deal-img">
-                <img src="{{ url_for('static', filename=deal.image_path) }}" alt="">
+                <img src="{{ asset_url(deal.image_path) }}" alt="">
             </div>
             {% endif %}
             <div class="deal-body">

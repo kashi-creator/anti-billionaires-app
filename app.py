@@ -143,6 +143,34 @@ def _inject_native_flag():
         return {"is_native_app": False}
 
 
+@app.context_processor
+def _inject_asset_url():
+    """Expose `asset_url(path)` to every template — routes user-uploaded
+    media through R2 (pre-signed) when R2 is enabled, leaving committed
+    static assets (CSS, JS, seed images) on the normal `url_for('static')`
+    path. See `lib/r2.py` and Phase 9 for the migration rationale.
+    """
+    from lib import r2
+
+    def asset_url(path):
+        """Resolve a file path to a renderable URL.
+
+        - None / empty -> empty string (caller renders placeholder)
+        - 'img/seed/...' or any non-uploads/ path -> static URL (committed asset)
+        - 'uploads/...' AND R2 enabled -> pre-signed R2 URL (1-hour expiry)
+        - 'uploads/...' AND R2 disabled -> static URL (local-dev fallback)
+        """
+        if not path:
+            return ""
+        if path.startswith("uploads/") and r2.enabled():
+            url = r2.presigned_url(path, expires=3600)
+            if url:
+                return url
+        return url_for("static", filename=path)
+
+    return {"asset_url": asset_url}
+
+
 def require_csrf(f):
     """Enforce CSRF on a route. Used while WTF_CSRF_CHECK_DEFAULT is False.
 
@@ -183,14 +211,36 @@ def allowed_file(filename):
 
 
 def save_upload(file):
-    if file and allowed_file(file.filename):
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(filepath)
-        return f"uploads/{filename}"
-    return None
+    """Persist a Werkzeug FileStorage and return its DB path string.
+
+    Always returns a key shaped `uploads/<uuid>.<ext>`. If R2 is enabled
+    (4 R2_* env vars all set), streams the file to the R2 bucket; otherwise
+    falls back to writing under `static/uploads/` on local disk so dev
+    workflow stays simple. If R2 push fails mid-flight the file is still
+    written to disk so the user's upload isn't dropped (degraded but durable
+    enough for the request to succeed; a retry / migration sweep can move
+    the file into R2 later).
+    """
+    if not (file and allowed_file(file.filename)):
+        return None
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    key = f"uploads/{filename}"
+    from lib import r2
+    if r2.enabled():
+        # Stream straight to R2; rewind the FileStorage cursor first.
+        file.stream.seek(0)
+        content_type = file.mimetype or "application/octet-stream"
+        if r2.upload_fileobj(file.stream, key, content_type=content_type):
+            return key
+        # If R2 push fails, fall through to local-disk write so the user
+        # still gets their file saved (degraded but not dropped).
+        app.logger.warning("R2 upload failed for %s; falling back to local disk.", key)
+        file.stream.seek(0)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(filepath)
+    return key
 
 
 def create_notification(user_id, type, message, link=None):

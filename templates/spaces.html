@@ -13,7 +13,7 @@
     <div class="spaces-grid">
         {% for space in spaces %}
         <a href="{{ url_for('space_detail', space_id=space.id) }}" class="space-card">
-            <div class="space-cover" {% if space.cover_image %}style="background-image: url('{{ url_for('static', filename=space.cover_image) }}')"{% endif %}>
+            <div class="space-cover" {% if space.cover_image %}style="background-image: url('{{ asset_url(space.cover_image) }}')"{% endif %}>
                 {% if not space.cover_image %}
                 <div class="space-cover-placeholder">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>

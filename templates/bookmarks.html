@@ -16,7 +16,7 @@
                 <a href="{{ url_for('profile', user_id=post.author.id) }}" class="post-author">
                     <div class="avatar avatar-sm">
                         {% if post.author.profile_photo %}
-                        <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(post.author.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ post.author.name[0]|upper }}</span>
                         {% endif %}
@@ -34,7 +34,7 @@
                 <p>{{ post.content }}</p>
                 {% if post.image_path %}
                 <div class="post-image">
-                    <img src="{{ url_for('static', filename=post.image_path) }}" alt="" loading="lazy">
+                    <img src="{{ asset_url(post.image_path) }}" alt="" loading="lazy">
                 </div>
                 {% endif %}
             </div>

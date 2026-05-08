@@ -16,7 +16,7 @@
         <a href="{{ url_for('features.chat', convo_id=convo.id) }}" class="convo-card {% if unread > 0 %}unread{% endif %}">
             <div class="avatar avatar-md">
                 {% if other.profile_photo %}
-                <img src="{{ url_for('static', filename=other.profile_photo) }}" alt="">
+                <img src="{{ asset_url(other.profile_photo) }}" alt="">
                 {% else %}
                 <span>{{ other.name[0]|upper }}</span>
                 {% endif %}

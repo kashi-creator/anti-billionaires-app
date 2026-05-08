@@ -13,7 +13,7 @@
         <div class="course-card">
             {% if course.cover_image %}
             <div class="course-cover">
-                <img src="{{ url_for('static', filename=course.cover_image) }}" alt="">
+                <img src="{{ asset_url(course.cover_image) }}" alt="">
             </div>
             {% else %}
             <div class="course-cover course-cover-placeholder">

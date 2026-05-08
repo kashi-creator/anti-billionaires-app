@@ -264,7 +264,7 @@
       <div class="ref-row">
         <div class="ref-avatar">
           {% if r.user.profile_photo %}
-            <img src="{{ url_for('static', filename=r.user.profile_photo) }}" alt="">
+            <img src="{{ asset_url(r.user.profile_photo) }}" alt="">
           {% else %}
             {{ r.user.name[0]|upper }}
           {% endif %}

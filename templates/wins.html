@@ -33,7 +33,7 @@
                 <a href="{{ url_for('profile', user_id=win.author.id) }}" class="post-author">
                     <div class="avatar avatar-sm">
                         {% if win.author.profile_photo %}
-                        <img src="{{ url_for('static', filename=win.author.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(win.author.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ win.author.name[0]|upper }}</span>
                         {% endif %}
@@ -50,7 +50,7 @@
             {% endif %}
             {% if win.image_path %}
             <div class="post-image">
-                <img src="{{ url_for('static', filename=win.image_path) }}" alt="Win">
+                <img src="{{ asset_url(win.image_path) }}" alt="Win">
             </div>
             {% endif %}
             <div class="win-reactions" data-win-id="{{ win.id }}">

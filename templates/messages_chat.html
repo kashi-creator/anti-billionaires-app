@@ -10,7 +10,7 @@
         <a href="{{ url_for('profile', user_id=other_user.id) }}" class="chat-user-info">
             <div class="avatar avatar-sm">
                 {% if other_user.profile_photo %}
-                <img src="{{ url_for('static', filename=other_user.profile_photo) }}" alt="">
+                <img src="{{ asset_url(other_user.profile_photo) }}" alt="">
                 {% else %}
                 <span>{{ other_user.name[0]|upper }}</span>
                 {% endif %}

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="feed-container">
     <div class="space-header-card">
-        <div class="space-detail-cover" {% if space.cover_image %}style="background-image: url('{{ url_for('static', filename=space.cover_image) }}')"{% endif %}>
+        <div class="space-detail-cover" {% if space.cover_image %}style="background-image: url('{{ asset_url(space.cover_image) }}')"{% endif %}>
         </div>
         <div class="space-detail-info">
             <div>
@@ -40,7 +40,7 @@
             <div class="composer-top">
                 <div class="avatar avatar-md">
                     {% if current_user.profile_photo %}
-                    <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(current_user.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ current_user.name[0]|upper }}</span>
                     {% endif %}
@@ -84,7 +84,7 @@
                 <a href="{{ url_for('profile', user_id=post.author.id) }}" class="post-author">
                     <div class="avatar avatar-sm">
                         {% if post.author.profile_photo %}
-                        <img src="{{ url_for('static', filename=post.author.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(post.author.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ post.author.name[0]|upper }}</span>
                         {% endif %}
@@ -104,7 +104,7 @@
                 <p>{{ post.content }}</p>
                 {% if post.image_path %}
                 <div class="post-image">
-                    <img src="{{ url_for('static', filename=post.image_path) }}" alt="Post image" loading="lazy">
+                    <img src="{{ asset_url(post.image_path) }}" alt="Post image" loading="lazy">
                 </div>
                 {% endif %}
             </div>
@@ -146,7 +146,7 @@
                 <div class="comment">
                     <a href="{{ url_for('profile', user_id=comment.author.id) }}" class="avatar avatar-xs">
                         {% if comment.author.profile_photo %}
-                        <img src="{{ url_for('static', filename=comment.author.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(comment.author.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ comment.author.name[0]|upper }}</span>
                         {% endif %}
@@ -163,7 +163,7 @@
                 <form class="comment-form" method="POST" action="{{ url_for('add_comment', post_id=post.id) }}">
                     <div class="avatar avatar-xs">
                         {% if current_user.profile_photo %}
-                        <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(current_user.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ current_user.name[0]|upper }}</span>
                         {% endif %}

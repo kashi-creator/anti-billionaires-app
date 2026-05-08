@@ -11,7 +11,7 @@
     <div class="story-author-bar">
         <div class="avatar avatar-sm">
             {% if story.author.profile_photo %}
-            <img src="{{ url_for('static', filename=story.author.profile_photo) }}" alt="">
+            <img src="{{ asset_url(story.author.profile_photo) }}" alt="">
             {% else %}
             <span>{{ story.author.name[0]|upper }}</span>
             {% endif %}
@@ -21,7 +21,7 @@
     </div>
     <div class="story-content" style="background: {{ story.bg_color }}">
         {% if story.image_path %}
-        <img src="{{ url_for('static', filename=story.image_path) }}" alt="Story" class="story-image">
+        <img src="{{ asset_url(story.image_path) }}" alt="Story" class="story-image">
         {% endif %}
         {% if story.text_content %}
         <p class="story-text">{{ story.text_content }}</p>

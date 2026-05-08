@@ -89,7 +89,7 @@
     <a href="{{ url_for('features.project_detail', project_id=project.id) }}" class="project-card">
       <div class="project-cover">
         {% if project.cover_image %}
-        <img src="{{ url_for('static', filename=project.cover_image) }}" alt="">
+        <img src="{{ asset_url(project.cover_image) }}" alt="">
         {% else %}
         <span class="project-cover-fallback">{{ project.title[0]|upper }}</span>
         {% endif %}

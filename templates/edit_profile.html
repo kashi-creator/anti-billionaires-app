@@ -11,7 +11,7 @@
             <div class="form-group" style="text-align:center">
                 <div class="avatar avatar-xl" style="margin:0 auto 1rem">
                     {% if current_user.profile_photo %}
-                    <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(current_user.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ current_user.name[0]|upper }}</span>
                     {% endif %}

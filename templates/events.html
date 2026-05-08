@@ -5,7 +5,7 @@
 <a href="{{ url_for('phase3.event_detail', event_id=event.id) }}" class="event-card">
     {% if event.cover_image %}
     <div class="event-cover">
-        <img src="{{ url_for('static', filename=event.cover_image) }}" alt="">
+        <img src="{{ asset_url(event.cover_image) }}" alt="">
     </div>
     {% else %}
     <div class="event-cover event-cover-placeholder">

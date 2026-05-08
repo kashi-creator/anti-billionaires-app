@@ -100,7 +100,7 @@
         <p class="ob-sub">Members put names to faces. Real photo only. No logos, no stock.</p>
         <div class="ob-photo-preview" id="photoPreview">
           {% if current_user.profile_photo %}
-            <img src="{{ url_for('static', filename=current_user.profile_photo) }}" alt="">
+            <img src="{{ asset_url(current_user.profile_photo) }}" alt="">
           {% else %}
             <span>+</span>
           {% endif %}

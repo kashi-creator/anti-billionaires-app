@@ -44,7 +44,7 @@
             <a href="{{ url_for('profile', user_id=sub.author.id) }}" class="post-author">
                 <div class="avatar avatar-sm">
                     {% if sub.author.profile_photo %}
-                    <img src="{{ url_for('static', filename=sub.author.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(sub.author.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ sub.author.name[0]|upper }}</span>
                     {% endif %}
@@ -56,7 +56,7 @@
         </div>
         <p style="margin:0.75rem 0">{{ sub.content }}</p>
         {% if sub.image_path %}
-        <div class="post-image"><img src="{{ url_for('static', filename=sub.image_path) }}" alt=""></div>
+        <div class="post-image"><img src="{{ asset_url(sub.image_path) }}" alt=""></div>
         {% endif %}
         <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem">
             <button class="action-btn {% if sub.voted_by(current_user) %}liked{% endif %}" onclick="voteSubmission({{ sub.id }}, this)">

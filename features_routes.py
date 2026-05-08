@@ -42,14 +42,26 @@ def _allowed(filename):
 
 
 def _save_upload(file):
-    if file and _allowed(file.filename):
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        upload_dir = current_app.config["UPLOAD_FOLDER"]
-        os.makedirs(upload_dir, exist_ok=True)
-        file.save(os.path.join(upload_dir, filename))
-        return f"uploads/{filename}"
-    return None
+    """Persist an upload — see `app.save_upload` for the canonical impl.
+    Streams to R2 when enabled, falls back to local disk otherwise.
+    """
+    if not (file and _allowed(file.filename)):
+        return None
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    key = f"uploads/{filename}"
+    from lib import r2
+    if r2.enabled():
+        file.stream.seek(0)
+        content_type = file.mimetype or "application/octet-stream"
+        if r2.upload_fileobj(file.stream, key, content_type=content_type):
+            return key
+        current_app.logger.warning("R2 upload failed for %s; falling back to local disk.", key)
+        file.stream.seek(0)
+    upload_dir = current_app.config["UPLOAD_FOLDER"]
+    os.makedirs(upload_dir, exist_ok=True)
+    file.save(os.path.join(upload_dir, filename))
+    return key
 
 
 def _create_notification(user_id, ntype, message, link=None):

@@ -18,7 +18,7 @@
                 <a href="{{ url_for('profile', user_id=reel.author.id) }}" class="post-author">
                     <div class="avatar avatar-sm">
                         {% if reel.author.profile_photo %}
-                        <img src="{{ url_for('static', filename=reel.author.profile_photo) }}" alt="">
+                        <img src="{{ asset_url(reel.author.profile_photo) }}" alt="">
                         {% else %}
                         <span>{{ reel.author.name[0]|upper }}</span>
                         {% endif %}

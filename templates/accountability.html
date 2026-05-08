@@ -69,7 +69,7 @@
             <div class="convo-card" style="margin-bottom:0.5rem">
                 <div class="avatar avatar-sm">
                     {% if partner.profile_photo %}
-                    <img src="{{ url_for('static', filename=partner.profile_photo) }}" alt="">
+                    <img src="{{ asset_url(partner.profile_photo) }}" alt="">
                     {% else %}
                     <span>{{ partner.name[0]|upper }}</span>
                     {% endif %}
