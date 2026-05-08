@@ -121,14 +121,22 @@
   h1 em { font-style: italic; color: var(--gold); font-weight: 300; }
 
   .lede {
-    max-width: 540px;
-    font-size: clamp(15px, 1.3vw, 18px);
-    color: var(--ink-soft);
-    line-height: 1.75;
+    max-width: 580px;
     margin-bottom: 56px;
     text-align: center;
   }
-  .lede strong { color: var(--ink); font-weight: 400; }
+  .lede p {
+    font-size: clamp(15px, 1.3vw, 18px);
+    color: var(--ink-soft);
+    line-height: 1.75;
+    margin: 0 0 20px;
+  }
+  .lede p:last-child { margin-bottom: 0; }
+  .lede em {
+    color: var(--gold);
+    font-style: normal;
+    font-weight: 400;
+  }
 
   .form-shell {
     width: 100%;
@@ -334,11 +342,13 @@
     {% endif %}
   </h1>
 
-  <p class="lede">
-    A private gathering of sovereign men — capital, discipline, brotherhood.
-    {% if inviter_name %}<strong>{{ inviter_name }}</strong> vouched for you.{% endif %}
-    Drop your details below and we'll send the meeting time, place, and what to expect.
-  </p>
+  <div class="lede">
+    <p>We categorically refuse the terms of this surrender.</p>
+    <p>We are a brotherhood of builders, thinkers, and protectors who have chosen to step out of the chaos and into purpose.</p>
+    <p>We are here to build sovereign wealth outside of their rigged casinos and forge unbreakable bonds in an age of profound isolation.</p>
+    <p>If you are comfortable with your life inside the matrix, stay where you are. If you are ready to do the real work then strap the fuck in and we will see you on Thursday evenings.</p>
+    <p>{% if inviter_name %}<em>{{ inviter_name }}</em> believes{% else %}We believe{% endif %} you belong here. Drop your details and we'll send you the time, place, and what to expect.</p>
+  </div>
 
   <form id="rsvp-form" class="form-shell" method="POST" action="{{ url_for('invite_submit', referral_code=referral_code) }}" novalidate>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
