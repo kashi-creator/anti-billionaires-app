@@ -5,7 +5,10 @@
 <div class="admin-container" style="max-width:1100px;margin:32px auto;padding:0 24px;">
   <div class="feed-header" style="margin-bottom:32px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
     <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;font-size:42px;margin:0;">Admin</h1>
-    <a href="{{ url_for('admin_ghl_health') }}" style="color:#D4AF37;text-decoration:none;font-size:13px;border:1px solid #D4AF37;padding:8px 14px;border-radius:6px;">GHL health →</a>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="{{ url_for('admin_meeting_settings') }}" style="color:#D4AF37;text-decoration:none;font-size:13px;border:1px solid #D4AF37;padding:8px 14px;border-radius:6px;">Meeting →</a>
+      <a href="{{ url_for('admin_ghl_health') }}" style="color:#D4AF37;text-decoration:none;font-size:13px;border:1px solid #D4AF37;padding:8px 14px;border-radius:6px;">GHL health →</a>
+    </div>
   </div>
 
   <div class="admin-stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:40px;">

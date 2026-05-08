@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Meeting Settings — Admin{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;margin:32px auto;padding:0 24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:32px;">
+    <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;font-size:42px;margin:0;">Meeting Details</h1>
+    <a href="{{ url_for('admin_panel') }}" style="color:#888;text-decoration:none;font-size:13px;">← Admin</a>
+  </div>
+
+  <p style="color:#888;font-size:14px;line-height:1.7;margin-bottom:32px;">
+    These values are plugged into the confirmation email + SMS that every
+    invite-RSVP receives. Update them weekly when the next gathering changes —
+    new RSVPs from that point on will see the updated details.
+    {% if settings.updated_at %}<br><span style="color:#666;font-size:12px;">Last updated {{ settings.updated_at.strftime('%b %d, %Y at %H:%M UTC') }}</span>{% endif %}
+  </p>
+
+  <form method="POST" style="background:#111;border:1px solid #1f1f1f;border-radius:8px;padding:32px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label style="display:block;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#888;margin-bottom:8px;">Meeting Date</label>
+    <input type="text" name="meeting_date" value="{{ settings.meeting_date }}" maxlength="120"
+           placeholder="e.g. Thursday, May 14"
+           style="width:100%;padding:12px 16px;background:#0a0a0a;border:1px solid #2a2a2a;color:#fff;border-radius:6px;font-size:15px;margin-bottom:24px;">
+
+    <label style="display:block;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#888;margin-bottom:8px;">Meeting Time</label>
+    <input type="text" name="meeting_time" value="{{ settings.meeting_time }}" maxlength="120"
+           placeholder="e.g. 6:30 PM EST"
+           style="width:100%;padding:12px 16px;background:#0a0a0a;border:1px solid #2a2a2a;color:#fff;border-radius:6px;font-size:15px;margin-bottom:24px;">
+
+    <label style="display:block;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#888;margin-bottom:8px;">Meeting Location</label>
+    <input type="text" name="meeting_location" value="{{ settings.meeting_location }}" maxlength="500"
+           placeholder="e.g. Revo Wellness · 155 8th St N · St. Petersburg, FL 33701"
+           style="width:100%;padding:12px 16px;background:#0a0a0a;border:1px solid #2a2a2a;color:#fff;border-radius:6px;font-size:15px;margin-bottom:32px;">
+
+    <button type="submit"
+            style="background:#D4AF37;color:#0A0A0A;border:none;padding:14px 28px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;">
+      Save
+    </button>
+  </form>
+
+  <div style="margin-top:32px;padding:24px;background:#0a0a0a;border:1px solid #1f1f1f;border-radius:8px;color:#888;font-size:13px;line-height:1.7;">
+    <strong style="color:#D4AF37;font-size:11px;letter-spacing:3px;text-transform:uppercase;display:block;margin-bottom:12px;">How this is used</strong>
+    Every RSVP submitted at <code style="color:#D4AF37;">/invite/&lt;referral_code&gt;</code>
+    triggers a confirmation email (and SMS if they opted in) sent via GHL Conversations API.
+    These three values get plugged in at send time, so editing them here changes what the
+    next RSVP receives — without redeploying the app.
+  </div>
+</div>
+{% endblock %}

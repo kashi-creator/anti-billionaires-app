@@ -31,6 +31,7 @@ from models import (
     Availability, CallBooking, Activity, StripeEvent, DeviceToken,
     AssessmentResponse,
     Project,
+    MeetingSettings,
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
@@ -1218,6 +1219,67 @@ def delete_post(post_id):
     return jsonify({"success": True})
 
 
+@app.route("/invite/<referral_code>")
+@limiter.limit("30 per hour")
+def invite_landing(referral_code):
+    """Public RSVP page for an invited guest. Personalizes with the inviter's
+    first name when the referral_code resolves; otherwise renders generically.
+    No User row is created here — RSVP guests live in GHL only until they sign
+    up through the normal funnel.
+    """
+    inviter = User.query.filter_by(referral_code=referral_code).first()
+    inviter_name = None
+    if inviter and inviter.name:
+        inviter_name = inviter.name.split()[0]
+    return render_template(
+        "invite.html",
+        referral_code=referral_code,
+        inviter_name=inviter_name,
+    )
+
+
+@app.route("/invite/<referral_code>", methods=["POST"])
+@limiter.limit("5 per hour")
+@require_csrf
+def invite_submit(referral_code):
+    """Accept an RSVP, push to GHL, return JSON. Guests stay GHL-only."""
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    phone = (request.form.get("phone") or "").strip()
+    sms_raw = (request.form.get("sms_opt_in") or "false").strip().lower()
+    sms_opt_in = sms_raw in ("true", "1", "on", "yes")
+
+    if not name or len(name) > 120:
+        return jsonify({"error": "Please enter your full name."}), 400
+    if "@" not in email or "." not in email or len(email) > 200:
+        return jsonify({"error": "Please enter a valid email."}), 400
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 7 or len(phone) > 40:
+        return jsonify({"error": "Please enter a valid phone number."}), 400
+
+    inviter = User.query.filter_by(referral_code=referral_code).first()
+    invited_by = inviter.name if inviter else None
+
+    settings = MeetingSettings.current()
+    allowlist = _admin_email_allowlist()
+    founder_email = next(iter(allowlist), None) if allowlist else "kashi@thebreathcoachschool.com"
+
+    ghl.register_meeting_rsvp(
+        email=email,
+        name=name,
+        phone=phone,
+        sms_opt_in=sms_opt_in,
+        invited_by=invited_by,
+        rsvp_source="invite-link",
+        meeting_date=settings.meeting_date,
+        meeting_time=settings.meeting_time,
+        meeting_location=settings.meeting_location,
+        founder_email=founder_email,
+    )
+
+    return jsonify({"success": True})
+
+
 @app.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute", methods=["POST"])
 @require_csrf
@@ -2293,6 +2355,23 @@ def admin_ghl_health():
     if request.args.get("format") == "json":
         return jsonify(result)
     return render_template("admin_ghl_health.html", result=result)
+
+
+@app.route("/admin/meeting", methods=["GET", "POST"])
+@admin_required
+@require_csrf
+def admin_meeting_settings():
+    """Set the next-gathering details that get plugged into invite-RSVP
+    confirmation email + SMS at send time."""
+    settings = MeetingSettings.current()
+    if request.method == "POST":
+        settings.meeting_date = (request.form.get("meeting_date") or "").strip()[:120]
+        settings.meeting_time = (request.form.get("meeting_time") or "").strip()[:120]
+        settings.meeting_location = (request.form.get("meeting_location") or "").strip()[:500]
+        db.session.commit()
+        flash("Meeting details updated. New RSVPs will use these values.", "success")
+        return redirect(url_for("admin_meeting_settings"))
+    return render_template("admin_meeting.html", settings=settings)
 
 
 # ===== THE VAULT (lessons alias) =====

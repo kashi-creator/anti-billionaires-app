@@ -146,6 +146,11 @@
                     <span>Reels</span>
                 </a>
 
+                <button type="button" class="nav-link nav-invite-btn" onclick="openInviteModal()" aria-label="Invite a Brother">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13v7a1 1 0 01-1 1H5a1 1 0 01-1-1v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    <span>Invite</span>
+                </button>
+
                 <!-- Points badge -->
                 <div class="nav-points-wrap">
                     <span class="nav-points-badge">{{ current_user.points or 0 }} pts</span>
@@ -227,6 +232,7 @@
             <a href="{{ url_for('features.find_brothers') }}" class="mobile-link">Find Brothers</a>
             <a href="{{ url_for('features.inbox') }}" class="mobile-link">Messages</a>
             <a href="{{ url_for('features.reels') }}" class="mobile-link">Reels</a>
+            <button type="button" class="mobile-link mobile-invite-link" onclick="toggleMobileMenu(); openInviteModal();">Invite a Brother</button>
             <a href="{{ url_for('features.wins') }}" class="mobile-link">Wins</a>
             <a href="{{ url_for('features.deals') }}" class="mobile-link">Deals</a>
             <a href="{{ url_for('features.projects') }}" class="mobile-link">Projects</a>
@@ -248,6 +254,86 @@
             <a href="{{ url_for('logout') }}" class="mobile-link logout">Logout</a>
         </div>
     </nav>
+
+    <!-- Invite a Brother modal (gold/black, modal-on-modal-safe, share/copy) -->
+    <div id="inviteModalBackdrop" class="invite-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="inviteModalTitle" hidden>
+        <div class="invite-modal" role="document">
+            <button type="button" class="invite-modal-close" onclick="closeInviteModal()" aria-label="Close">&times;</button>
+            <h2 id="inviteModalTitle" class="invite-modal-title">Bring a Brother to the Table</h2>
+            <p class="invite-modal-sub">Your private invite link — they'll see your name on the page.</p>
+            <input type="text" id="inviteModalUrl" class="invite-modal-url" readonly
+                   value="{{ url_for('invite_landing', referral_code=current_user.referral_code, _external=True) }}"
+                   onclick="this.select()" aria-label="Your invite link">
+            <div class="invite-modal-actions">
+                <button type="button" id="inviteCopyBtn" class="invite-modal-btn" onclick="copyInviteLink()">Copy Link</button>
+                <button type="button" id="inviteShareBtn" class="invite-modal-btn invite-modal-btn-ghost" onclick="shareInviteLink()" hidden>Share</button>
+            </div>
+            <p class="invite-modal-meta">Tap Share on phone to send via Messages, WhatsApp, etc.</p>
+        </div>
+    </div>
+
+    <style>
+      .nav-invite-btn {
+        background: transparent; border: 1px solid #D4AF37; color: #D4AF37;
+        cursor: pointer; font: inherit;
+      }
+      .nav-invite-btn:hover { background: rgba(212,175,55,0.08); }
+      .mobile-invite-link {
+        background: transparent; border: 0; text-align: left; width: 100%;
+        font: inherit; cursor: pointer; color: #D4AF37;
+      }
+      .invite-modal-backdrop {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.78); backdrop-filter: blur(4px);
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+      }
+      .invite-modal-backdrop[hidden] { display: none; }
+      .invite-modal {
+        position: relative; width: 100%; max-width: 480px;
+        background: #0E0E0E; border: 1px solid rgba(212,175,55,0.25);
+        padding: 36px 32px 28px; color: #E8E8E8;
+        font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      }
+      .invite-modal-close {
+        position: absolute; top: 12px; right: 14px;
+        background: transparent; border: 0; color: #888;
+        font-size: 28px; line-height: 1; cursor: pointer; padding: 4px 10px;
+      }
+      .invite-modal-close:hover { color: #D4AF37; }
+      .invite-modal-title {
+        font-family: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+        font-weight: 300; font-size: clamp(26px, 4vw, 34px);
+        line-height: 1.15; color: #E8E8E8; margin: 0 0 12px;
+      }
+      .invite-modal-sub {
+        font-size: 14px; line-height: 1.6; color: #9A9A9A; margin: 0 0 24px;
+      }
+      .invite-modal-url {
+        width: 100%; padding: 14px 16px; margin-bottom: 16px;
+        background: #0A0A0A; border: 1px solid rgba(212,175,55,0.22);
+        color: #D4AF37; font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+        font-size: 13px; user-select: all;
+      }
+      .invite-modal-url:focus { outline: 1px solid #D4AF37; }
+      .invite-modal-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+      .invite-modal-btn {
+        flex: 1; padding: 14px 18px; cursor: pointer;
+        font-family: 'JetBrains Mono', monospace; font-size: 11px;
+        letter-spacing: 3px; text-transform: uppercase;
+        background: #D4AF37; border: 1px solid #D4AF37; color: #0A0A0A;
+        transition: background 0.2s, transform 0.15s;
+      }
+      .invite-modal-btn:hover { background: #E8E8E8; border-color: #E8E8E8; }
+      .invite-modal-btn-ghost {
+        background: transparent; color: #D4AF37;
+      }
+      .invite-modal-btn-ghost:hover { background: rgba(212,175,55,0.08); color: #D4AF37; }
+      .invite-modal-meta {
+        font-family: 'JetBrains Mono', monospace; font-size: 10px;
+        letter-spacing: 1.5px; color: #555; margin: 0; text-align: center;
+      }
+    </style>
     {% endif %}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -313,6 +399,53 @@
                 setTimeout(() => el.remove(), 300);
             });
         }, 4000);
+
+        // Invite-a-Brother modal
+        function openInviteModal() {
+            const bd = document.getElementById('inviteModalBackdrop');
+            if (!bd) return;
+            const shareBtn = document.getElementById('inviteShareBtn');
+            if (shareBtn && navigator.share) shareBtn.hidden = false;
+            bd.hidden = false;
+            document.body.style.overflow = 'hidden';
+            const url = document.getElementById('inviteModalUrl');
+            if (url) setTimeout(() => url.focus(), 0);
+        }
+        function closeInviteModal() {
+            const bd = document.getElementById('inviteModalBackdrop');
+            if (!bd) return;
+            bd.hidden = true;
+            document.body.style.overflow = '';
+            const btn = document.getElementById('inviteCopyBtn');
+            if (btn) btn.textContent = 'Copy Link';
+        }
+        function copyInviteLink() {
+            const url = document.getElementById('inviteModalUrl');
+            const btn = document.getElementById('inviteCopyBtn');
+            if (!url) return;
+            const value = url.value;
+            const ok = () => { if (btn) { btn.textContent = 'Copied ✓'; setTimeout(() => { btn.textContent = 'Copy Link'; }, 1500); } };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(value).then(ok, () => { url.select(); document.execCommand('copy'); ok(); });
+            } else {
+                url.select(); document.execCommand('copy'); ok();
+            }
+        }
+        function shareInviteLink() {
+            const url = document.getElementById('inviteModalUrl');
+            if (!url || !navigator.share) return;
+            navigator.share({ title: 'Sovereign Society', text: "I'm bringing you to the table.", url: url.value }).catch(() => {});
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const bd = document.getElementById('inviteModalBackdrop');
+                if (bd && !bd.hidden) closeInviteModal();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            const bd = document.getElementById('inviteModalBackdrop');
+            if (bd && !bd.hidden && e.target === bd) closeInviteModal();
+        });
     </script>
     {% block scripts %}{% endblock %}
     {% if is_native_app %}<script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>{% endif %}

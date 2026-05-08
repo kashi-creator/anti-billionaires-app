@@ -1197,6 +1197,25 @@ class ProjectPaymentMethod(db.Model):
     def is_url(self):
         return self.method_type in ("paypal", "stripe_link", "custom_link")
 
+
+class MeetingSettings(db.Model):
+    """Single-row config for the next gathering. Plugged into the invite-RSVP
+    confirmation email + SMS at send time. Updated weekly via /admin/meeting."""
+    id = db.Column(db.Integer, primary_key=True)
+    meeting_date = db.Column(db.String(120), default="", nullable=False)
+    meeting_time = db.Column(db.String(120), default="", nullable=False)
+    meeting_location = db.Column(db.String(500), default="", nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @classmethod
+    def current(cls):
+        row = cls.query.first()
+        if row is None:
+            row = cls(id=1)
+            db.session.add(row)
+            db.session.commit()
+        return row
+
     @property
     def display_label(self):
         if self.label:

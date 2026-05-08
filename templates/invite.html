@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>You're Invited — Sovereign Society</title>
+<meta name="description" content="A private gathering for sovereign men. By invitation only.">
+<meta name="robots" content="noindex,nofollow">
+<meta property="og:title" content="Sovereign Society — You're Invited">
+<meta property="og:description" content="A private gathering for sovereign men. By invitation only.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="{{ url_for('static', filename='img/sovereign-logo.png', _external=True) }}">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --bg-2: #0E0E0E;
+    --ink: #E8E8E8;
+    --ink-soft: #9A9A9A;
+    --ink-faint: #555;
+    --gold: #D4AF37;
+    --gold-soft: #C9A84C;
+    --line: rgba(212,175,55,0.12);
+    --line-strong: rgba(212,175,55,0.25);
+    --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Inter', -apple-system, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-weight: 300;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #rain {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0; pointer-events: none;
+    opacity: 0.45;
+  }
+  .vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(ellipse at center, transparent 0%, transparent 55%, rgba(0,0,0,0.7) 100%),
+      radial-gradient(ellipse at top, rgba(212,175,55,0.06), transparent 60%);
+  }
+  .grain {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none;
+    opacity: 0.04; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  .hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 40px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .hud .brand { display: flex; align-items: center; gap: 12px; }
+  .hud .brand-mark-img {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    filter: drop-shadow(0 0 8px rgba(212,175,55,0.35));
+  }
+  .hud .brand-text {
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: 5px;
+  }
+  @media (max-width: 768px) { .hud { padding: 16px 20px; } }
+
+  .stage {
+    position: relative; z-index: 5;
+    min-height: 100vh;
+    padding: 120px 6vw 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    max-width: 720px; margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 28px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .eyebrow::before, .eyebrow::after {
+    content: ""; width: 32px; height: 1px; background: var(--gold);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(40px, 7vw, 88px);
+    line-height: 1.0;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 28px;
+    text-align: center;
+  }
+  h1 em { font-style: italic; color: var(--gold); font-weight: 300; }
+
+  .lede {
+    max-width: 540px;
+    font-size: clamp(15px, 1.3vw, 18px);
+    color: var(--ink-soft);
+    line-height: 1.75;
+    margin-bottom: 56px;
+    text-align: center;
+  }
+  .lede strong { color: var(--ink); font-weight: 400; }
+
+  .form-shell {
+    width: 100%;
+    max-width: 480px;
+    border: 1px solid var(--line-strong);
+    background: rgba(14,14,14,0.6);
+    backdrop-filter: blur(8px);
+    padding: 40px 36px;
+  }
+  @media (max-width: 540px) {
+    .form-shell { padding: 32px 22px; }
+    .stage { padding: 100px 5vw 60px; }
+  }
+
+  .form-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 28px;
+    text-align: center;
+  }
+
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+  input[type="text"], input[type="email"], input[type="tel"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--line-strong);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    font-weight: 300;
+    padding: 12px 0;
+    margin-bottom: 28px;
+    transition: border-color 0.25s;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  input:focus {
+    outline: none;
+    border-bottom-color: var(--gold);
+  }
+  input::placeholder { color: var(--ink-faint); }
+
+  .opt-in {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 36px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .opt-in input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border: 1px solid var(--line-strong);
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 2px;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .opt-in input[type="checkbox"]:checked {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .opt-in input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px; top: 1px;
+    width: 5px; height: 10px;
+    border: solid var(--bg);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .opt-in-text {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .btn-submit {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    padding: 18px;
+    border: 1px solid var(--gold);
+    color: var(--bg);
+    background: var(--gold);
+    cursor: pointer;
+    transition: background 0.3s, color 0.3s, transform 0.2s;
+  }
+  .btn-submit:hover:not(:disabled) {
+    background: var(--ink);
+    border-color: var(--ink);
+    transform: translateY(-2px);
+  }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .form-error {
+    color: #E55;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    text-align: center;
+    min-height: 16px;
+  }
+
+  .footer-note {
+    margin-top: 32px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--ink-faint);
+    text-align: center;
+  }
+
+  /* SUCCESS STATE */
+  .success {
+    display: none;
+    text-align: center;
+    width: 100%;
+    max-width: 540px;
+  }
+  .success.shown { display: block; }
+  .form-shell.hidden { display: none; }
+  .success-seal {
+    width: 84px; height: 84px;
+    margin: 0 auto 32px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold);
+    font-family: var(--serif);
+    font-size: 48px;
+    font-weight: 300;
+    box-shadow: 0 0 40px rgba(212,175,55,0.18);
+  }
+  .success h2 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(32px, 5vw, 56px);
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 24px;
+  }
+  .success h2 em { font-style: italic; color: var(--gold); }
+  .success p {
+    color: var(--ink-soft);
+    font-size: 15px;
+    line-height: 1.75;
+    max-width: 440px;
+    margin: 0 auto 16px;
+  }
+
+  footer {
+    position: relative; z-index: 5;
+    border-top: 1px solid var(--line);
+    padding: 32px 6vw;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="rain"></canvas>
+<div class="vignette"></div>
+<div class="grain"></div>
+
+<header class="hud">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="brand-mark-img">
+    <span class="brand-text">Sovereign Society</span>
+  </div>
+  <span>Private · By Invitation</span>
+</header>
+
+<main class="stage">
+  <div class="eyebrow">Invitation</div>
+
+  <h1>
+    {% if inviter_name %}
+      <em>{{ inviter_name }}</em> invited you<br>to the table.
+    {% else %}
+      You've been <em>invited</em><br>to the table.
+    {% endif %}
+  </h1>
+
+  <p class="lede">
+    A private gathering of sovereign men — capital, discipline, brotherhood.
+    {% if inviter_name %}<strong>{{ inviter_name }}</strong> vouched for you.{% endif %}
+    Drop your details below and we'll send the meeting time, place, and what to expect.
+  </p>
+
+  <form id="rsvp-form" class="form-shell" method="POST" action="{{ url_for('invite_submit', referral_code=referral_code) }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-meta">RSVP · The Next Meeting</div>
+
+    <div class="form-error" id="form-error" role="alert" aria-live="polite"></div>
+
+    <label for="rsvp-name">Full Name</label>
+    <input type="text" id="rsvp-name" name="name" autocomplete="name" required maxlength="120" placeholder="Your name">
+
+    <label for="rsvp-email">Email</label>
+    <input type="email" id="rsvp-email" name="email" autocomplete="email" required maxlength="200" placeholder="you@domain.com">
+
+    <label for="rsvp-phone">Phone</label>
+    <input type="tel" id="rsvp-phone" name="phone" autocomplete="tel" required maxlength="40" placeholder="+1 555 123 4567">
+
+    <label class="opt-in">
+      <input type="checkbox" name="sms_opt_in" value="true">
+      <span class="opt-in-text">
+        Send me a text confirmation with the meeting details. Standard rates apply.
+        Uncheck if you'd rather receive email only.
+      </span>
+    </label>
+
+    <button type="submit" class="btn-submit" id="rsvp-submit">I'm In</button>
+
+    <div class="footer-note">Your details stay private. No spam.</div>
+  </form>
+
+  <div class="success" id="rsvp-success" aria-live="polite">
+    <div class="success-seal">✓</div>
+    <h2>You're <em>in</em>.</h2>
+    <p>Confirmation is on its way to your inbox{% if true %} — check email (and texts, if you opted in) for the meeting time, place, and what to bring{% endif %}.</p>
+    <p>See you at the table.</p>
+  </div>
+</main>
+
+<footer>
+  Sovereign Society · Private · By Invitation Only
+</footer>
+
+<script>
+  // Gold rain — same pattern as landing.html, lighter density.
+  (function() {
+    const c = document.getElementById('rain');
+    const ctx = c.getContext('2d');
+    let drops = [];
+    function resize() {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+      const count = Math.max(40, Math.floor(window.innerWidth / 24));
+      drops = Array.from({length: count}, () => ({
+        x: Math.random() * c.width,
+        y: Math.random() * c.height,
+        l: 8 + Math.random() * 18,
+        s: 1.5 + Math.random() * 3.0,
+        a: 0.15 + Math.random() * 0.45,
+      }));
+    }
+    function tick() {
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.lineWidth = 1;
+      for (const d of drops) {
+        ctx.strokeStyle = `rgba(212,175,55,${d.a})`;
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(d.x, d.y + d.l);
+        ctx.stroke();
+        d.y += d.s;
+        if (d.y > c.height) {
+          d.y = -d.l;
+          d.x = Math.random() * c.width;
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    tick();
+  })();
+
+  // AJAX submit — keeps the cinematic feel, swaps to success state without nav.
+  (function() {
+    const form = document.getElementById('rsvp-form');
+    const errBox = document.getElementById('form-error');
+    const submit = document.getElementById('rsvp-submit');
+    const success = document.getElementById('rsvp-success');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.textContent = '';
+      submit.disabled = true;
+      submit.textContent = 'Sending…';
+
+      const fd = new FormData(form);
+      // Checkbox: only submitted when checked. Normalize for backend.
+      if (!fd.has('sms_opt_in')) fd.set('sms_opt_in', 'false');
+
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: fd,
+          headers: { 'X-CSRFToken': fd.get('csrf_token') || '' },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          errBox.textContent = data.error || 'Something went wrong. Try again.';
+          submit.disabled = false;
+          submit.textContent = "I'm In";
+          return;
+        }
+        form.classList.add('hidden');
+        success.classList.add('shown');
+      } catch (err) {
+        errBox.textContent = 'Network error. Check your connection and try again.';
+        submit.disabled = false;
+        submit.textContent = "I'm In";
+      }
+    });
+  })();
+</script>
+
+</body>
+</html>

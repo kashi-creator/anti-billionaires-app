@@ -187,6 +187,286 @@ def health_check() -> dict:
     return result
 
 
+def _upsert_contact_sync(
+    *,
+    email: str,
+    name: str,
+    phone: Optional[str] = None,
+    stage_tag: Optional[str] = None,
+    custom_fields: Optional[dict] = None,
+    extra_tags: Optional[Iterable[str]] = None,
+) -> Optional[str]:
+    """Synchronous variant of upsert_contact that returns the GHL contact id.
+
+    Used by flows that need to chain follow-up calls (e.g. send a Conversations
+    message to the just-upserted contact). Same validation rules as
+    upsert_contact. Returns None on any failure or when GHL is unconfigured.
+    """
+    if stage_tag and stage_tag not in STAGE_TAGS:
+        raise ValueError(f"stage_tag must be one of {STAGE_TAGS}, got {stage_tag!r}")
+
+    tags = []
+    if stage_tag:
+        tags.append(stage_tag)
+    if extra_tags:
+        for t in extra_tags:
+            if t in STAGE_TAGS:
+                raise ValueError(f"{t!r} is a stage tag — pass via stage_tag=")
+            tags.append(t)
+
+    if not _enabled():
+        return None
+
+    payload = {
+        "email": email.lower().strip(),
+        "name": name,
+        "locationId": os.environ["GHL_LOCATION_ID"],
+    }
+    if phone:
+        payload["phone"] = phone
+    if tags:
+        payload["tags"] = tags
+    if custom_fields:
+        payload["customFields"] = [
+            {"key": k, "value": "" if v is None else str(v)}
+            for k, v in custom_fields.items()
+        ]
+
+    try:
+        r = requests.post(
+            f"{GHL_BASE}/contacts/upsert",
+            headers=_headers(),
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            log.warning("ghl._upsert_contact_sync %s: %s", r.status_code, r.text[:200])
+            return None
+        return (r.json().get("contact") or {}).get("id")
+    except Exception as e:
+        log.warning("ghl._upsert_contact_sync failed: %s", e)
+        return None
+
+
+def send_email_to_contact(*, contact_id: str, subject: str, html: str) -> bool:
+    """Send a one-off email to a GHL contact via Conversations API. Synchronous.
+
+    Returns True on 2xx, False otherwise. Caller is expected to be running
+    inside a daemon thread if it wants fail-silent semantics.
+    """
+    if not (_enabled() and contact_id):
+        return False
+    payload = {
+        "type": "Email",
+        "contactId": contact_id,
+        "subject": subject,
+        "html": html,
+    }
+    try:
+        r = requests.post(
+            f"{GHL_BASE}/conversations/messages",
+            headers=_headers(),
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            log.warning("ghl.send_email_to_contact %s: %s", r.status_code, r.text[:200])
+            return False
+        return True
+    except Exception as e:
+        log.warning("ghl.send_email_to_contact failed: %s", e)
+        return False
+
+
+def send_sms_to_contact(*, contact_id: str, message: str) -> bool:
+    """Send a one-off SMS to a GHL contact via Conversations API. Synchronous."""
+    if not (_enabled() and contact_id):
+        return False
+    payload = {
+        "type": "SMS",
+        "contactId": contact_id,
+        "message": message,
+    }
+    try:
+        r = requests.post(
+            f"{GHL_BASE}/conversations/messages",
+            headers=_headers(),
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            log.warning("ghl.send_sms_to_contact %s: %s", r.status_code, r.text[:200])
+            return False
+        return True
+    except Exception as e:
+        log.warning("ghl.send_sms_to_contact failed: %s", e)
+        return False
+
+
+def find_contact_id_by_email(email: str) -> Optional[str]:
+    """Look up a GHL contact id by exact email. Returns None if not found."""
+    if not _enabled():
+        return None
+    try:
+        r = requests.get(
+            f"{GHL_BASE}/contacts/",
+            headers=_headers(),
+            params={
+                "locationId": os.environ["GHL_LOCATION_ID"],
+                "query": email,
+                "limit": 25,
+            },
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            log.warning("ghl.find_contact_id_by_email %s: %s", r.status_code, r.text[:200])
+            return None
+        target = email.lower().strip()
+        for c in (r.json().get("contacts") or []):
+            if (c.get("email") or "").lower().strip() == target:
+                return c.get("id")
+        return None
+    except Exception as e:
+        log.warning("ghl.find_contact_id_by_email failed: %s", e)
+        return None
+
+
+def register_meeting_rsvp(
+    *,
+    email: str,
+    name: str,
+    phone: Optional[str] = None,
+    sms_opt_in: bool = False,
+    invited_by: Optional[str] = None,
+    rsvp_source: str = "invite-link",
+    meeting_date: str = "",
+    meeting_time: str = "",
+    meeting_location: str = "",
+    founder_email: Optional[str] = None,
+) -> None:
+    """Push a meeting-RSVP to GHL and fire the confirmation email/SMS plus
+    founder notification — all in a single fire-and-forget daemon thread.
+
+    Guests aren't members yet — no User row is created. They enter GHL as a
+    `prospect` with `meeting-rsvp` + `invite-page` (+ `sms-opted-in` when
+    opted in). The actual sends are routed through GHL's Conversations API
+    (LC Email + LC Phone) so we don't need a separate SMTP / Twilio account.
+
+    Fail-silent: any individual step that errors gets logged but does not
+    affect the user-facing route or block subsequent steps.
+    """
+    extra_tags = ["meeting-rsvp", "invite-page"]
+    if sms_opt_in:
+        extra_tags.append("sms-opted-in")
+
+    custom_fields = {
+        "sms_opt_in": "true" if sms_opt_in else "false",
+        "rsvp_source": rsvp_source,
+        "invited_by": invited_by or "",
+    }
+
+    def _run():
+        contact_id = _upsert_contact_sync(
+            email=email,
+            name=name,
+            phone=phone,
+            stage_tag="prospect",
+            extra_tags=extra_tags,
+            custom_fields=custom_fields,
+        )
+        if not contact_id:
+            log.warning("register_meeting_rsvp: upsert returned no contact_id; skipping sends")
+            return
+
+        first_name = (name.split() or [name])[0]
+        host = invited_by or "A member"
+
+        confirm_subject = f"You're in. The next gathering — {meeting_date}." if meeting_date else "You're in. The next gathering."
+        confirm_html = _render_confirmation_html(
+            first_name=first_name,
+            host=host,
+            meeting_date=meeting_date,
+            meeting_time=meeting_time,
+            meeting_location=meeting_location,
+        )
+        send_email_to_contact(contact_id=contact_id, subject=confirm_subject, html=confirm_html)
+
+        if sms_opt_in and phone:
+            sms_body = _render_confirmation_sms(
+                first_name=first_name,
+                meeting_date=meeting_date,
+                meeting_time=meeting_time,
+                meeting_location=meeting_location,
+            )
+            send_sms_to_contact(contact_id=contact_id, message=sms_body)
+
+        # Founder notification (email-only).
+        if founder_email:
+            founder_id = find_contact_id_by_email(founder_email)
+            if founder_id:
+                send_email_to_contact(
+                    contact_id=founder_id,
+                    subject=f"New RSVP: {name} (invited by {host})",
+                    html=_render_founder_html(
+                        name=name, email=email, phone=phone or "(not provided)",
+                        sms_opt_in=sms_opt_in, host=host,
+                        meeting_date=meeting_date, meeting_time=meeting_time,
+                        meeting_location=meeting_location,
+                    ),
+                )
+            else:
+                log.warning("register_meeting_rsvp: founder contact %s not found in GHL", founder_email)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _render_confirmation_html(*, first_name, host, meeting_date, meeting_time, meeting_location):
+    where = meeting_location or "(location TBD — we'll send details soon)"
+    when = " · ".join(x for x in (meeting_date, meeting_time) if x) or "(time TBD — we'll send details soon)"
+    return f"""\
+<!DOCTYPE html>
+<html><body style="margin:0;background:#0A0A0A;color:#E8E8E8;font-family:Georgia,'Times New Roman',serif;padding:32px 24px;">
+<div style="max-width:560px;margin:0 auto;">
+  <p style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#D4AF37;margin:0 0 24px;">Sovereign Society</p>
+  <p style="font-size:18px;line-height:1.55;color:#E8E8E8;margin:0 0 18px;">{first_name},</p>
+  <p style="font-size:16px;line-height:1.7;color:#bdbdbd;margin:0 0 18px;">{host} brought you to the table.</p>
+  <p style="font-size:16px;line-height:1.7;color:#bdbdbd;margin:0 0 28px;">Here's what you need to know:</p>
+  <p style="font-size:15px;line-height:1.7;color:#E8E8E8;margin:0 0 12px;"><strong style="color:#D4AF37;">When:</strong> {when}</p>
+  <p style="font-size:15px;line-height:1.7;color:#E8E8E8;margin:0 0 28px;"><strong style="color:#D4AF37;">Where:</strong> {where}</p>
+  <p style="font-size:15px;line-height:1.7;color:#bdbdbd;margin:0 0 16px;">A small, private gathering of sovereign men. Capital, discipline, brotherhood. Come prepared to listen, contribute, and meet men who play the long game.</p>
+  <p style="font-size:15px;line-height:1.7;color:#bdbdbd;margin:0 0 16px;">Show up sharp. Show up early. Bring nothing but your presence.</p>
+  <p style="font-size:15px;line-height:1.7;color:#E8E8E8;margin:32px 0 4px;">See you at the table.</p>
+  <p style="font-size:13px;line-height:1.7;color:#888;margin:0;">— Sovereign Society</p>
+</div>
+</body></html>
+"""
+
+
+def _render_confirmation_sms(*, first_name, meeting_date, meeting_time, meeting_location):
+    when = " · ".join(x for x in (meeting_date, meeting_time) if x) or "details to follow"
+    where = meeting_location or "details to follow"
+    return f"{first_name}, you're confirmed for Sovereign Society — {when}. {where}. See you there."
+
+
+def _render_founder_html(*, name, email, phone, sms_opt_in, host, meeting_date, meeting_time, meeting_location):
+    when = " · ".join(x for x in (meeting_date, meeting_time) if x) or "(none set)"
+    return f"""\
+<!DOCTYPE html>
+<html><body style="font-family:-apple-system,sans-serif;color:#222;padding:24px;">
+<h2 style="margin:0 0 16px;">New RSVP — Sovereign Society</h2>
+<table style="border-collapse:collapse;font-size:14px;">
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Name</td><td>{name}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Email</td><td>{email}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Phone</td><td>{phone}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">SMS opt-in</td><td>{'yes' if sms_opt_in else 'no'}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Invited by</td><td>{host}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Meeting</td><td>{when}</td></tr>
+  <tr><td style="padding:4px 14px 4px 0;color:#666;">Location</td><td>{meeting_location or '(none set)'}</td></tr>
+</table>
+</body></html>
+"""
+
+
 def custom_fields_from_user(user) -> dict:
     """Build the standard 4-field dict from a User row."""
     return {
