@@ -39,6 +39,15 @@
                 <label for="confirm_password">Confirm Password</label>
                 <input type="password" id="confirm_password" name="confirm_password" required placeholder="Confirm password" autocomplete="new-password">
             </div>
+            {% if not (stripe_mode is defined and stripe_mode) %}
+            <div class="form-group">
+                <label for="referral_code">Referral Code <span style="color:#888;font-weight:400;">(optional)</span></label>
+                <input type="text" id="referral_code" name="referral_code" placeholder="From the brother who invited you"
+                       value="{{ referral_code or '' }}"
+                       autocomplete="off" maxlength="12"
+                       style="text-transform:uppercase;letter-spacing:0.05em;">
+            </div>
+            {% endif %}
             <button type="submit" class="btn btn-gold btn-full">Create Account</button>
         </form>
         <div class="auth-footer">

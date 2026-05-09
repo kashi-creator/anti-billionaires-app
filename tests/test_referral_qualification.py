@@ -208,6 +208,128 @@ def test_signup_uses_ghl_fallback_when_session_missing(app, client):
         assert new_user.referred_by == referrer_id
 
 
+def test_signup_form_referral_code_sets_referred_by(app, client):
+    """Manual code entry: prospect types the code into the signup form (no
+    session cookie, no GHL match) and gets attributed correctly. This is
+    the cross-device / different-email fallback path."""
+    from unittest.mock import patch
+
+    referrer_id = _make_user(app, "manualref@example.com", referral_code="MANUAL01")
+
+    with patch("app._resolve_referrer_from_ghl", return_value=None):
+        resp = client.post(
+            "/signup",
+            data={
+                "name": "Code Brother",
+                "email": "codebro@example.com",
+                "password": "longenoughpw1",
+                "confirm_password": "longenoughpw1",
+                "referral_code": "MANUAL01",
+            },
+            follow_redirects=False,
+        )
+    assert resp.status_code in (302, 303)
+
+    from models import User
+    with app.app_context():
+        new_user = User.query.filter_by(email="codebro@example.com").first()
+        assert new_user is not None
+        assert new_user.referred_by == referrer_id
+
+
+def test_signup_form_invalid_referral_code_falls_through(app, client):
+    """Bogus code should be ignored, NOT block signup. With no other
+    attribution signal, referred_by stays None."""
+    from unittest.mock import patch
+
+    with patch("app._resolve_referrer_from_ghl", return_value=None):
+        resp = client.post(
+            "/signup",
+            data={
+                "name": "Typo Brother",
+                "email": "typo@example.com",
+                "password": "longenoughpw1",
+                "confirm_password": "longenoughpw1",
+                "referral_code": "DOES_NOT_EXIST",
+            },
+            follow_redirects=False,
+        )
+    assert resp.status_code in (302, 303)
+
+    from models import User
+    with app.app_context():
+        new_user = User.query.filter_by(email="typo@example.com").first()
+        assert new_user is not None
+        assert new_user.referred_by is None
+
+
+def test_signup_generates_referral_code_immediately(app, client):
+    """Every new member gets their own referral_code at signup, not lazily
+    on first /referrals visit, so they can share their link from day 1."""
+    from unittest.mock import patch
+
+    with patch("app._resolve_referrer_from_ghl", return_value=None):
+        client.post(
+            "/signup",
+            data={
+                "name": "Eager Brother",
+                "email": "eager@example.com",
+                "password": "longenoughpw1",
+                "confirm_password": "longenoughpw1",
+            },
+            follow_redirects=False,
+        )
+
+    from models import User
+    with app.app_context():
+        new_user = User.query.filter_by(email="eager@example.com").first()
+        assert new_user is not None
+        assert new_user.referral_code  # truthy + non-empty
+
+
+def test_first_payment_creates_referrer_notification(app):
+    """When a referee makes their first $99 charge, the referrer should
+    get an in-app Notification immediately — not wait for the 6th payment."""
+    from unittest.mock import patch
+    from models import Notification, User
+
+    referrer_id = _make_user(app, "firstpayref@example.com", referral_code="FIRSTPAY",
+                              stripe_customer_id="cus_FP_R")
+    referee_id = _make_user(app, "firstpaykid@example.com", referred_by=referrer_id,
+                             stripe_customer_id="cus_FP_K", name="Firstpay Kid")
+
+    with patch("app.send_payment_succeeded"), \
+         patch("app.push_lib.send_push_to_user"):
+        _trigger_payment(app, referee_id)
+
+    with app.app_context():
+        notifs = Notification.query.filter_by(user_id=referrer_id, type="new_referral").all()
+        assert len(notifs) == 1
+        assert "Firstpay Kid" in notifs[0].message
+
+
+def test_second_payment_does_not_re_notify_referrer(app):
+    """The first-payment notification fires exactly once — at payment #1.
+    Subsequent payments must not spam the referrer."""
+    from unittest.mock import patch
+    from models import Notification
+
+    referrer_id = _make_user(app, "noremint@example.com", referral_code="NORESPAM",
+                              stripe_customer_id="cus_NR_R")
+    referee_id = _make_user(app, "norespamkid@example.com", referred_by=referrer_id,
+                             stripe_customer_id="cus_NR_K")
+
+    with patch("app.send_payment_succeeded"), \
+         patch("app.push_lib.send_push_to_user"):
+        _trigger_payment(app, referee_id)
+        _trigger_payment(app, referee_id)
+        _trigger_payment(app, referee_id)
+
+    with app.app_context():
+        notifs = Notification.query.filter_by(user_id=referrer_id, type="new_referral").all()
+        assert len(notifs) == 1
+
+
 def test_payment_webhook_syncs_referrer_to_ghl(app):
     """When a referee hits 6 payments, the referrer's GHL contact should be
     refreshed via sync_referrer_to_ghl (which calls upsert_contact).

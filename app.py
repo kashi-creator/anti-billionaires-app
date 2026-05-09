@@ -1377,28 +1377,35 @@ def signup():
         return redirect(url_for("feed"))
 
     prefilled_email = request.args.get("email", "").strip().lower()
+    # Prefill the referral-code field from the session if /invite/<code>
+    # set one, OR from a `?ref=CODE` query string for direct-share links.
+    prefilled_ref = (
+        request.args.get("ref", "").strip()
+        or session.get("referred_by_code", "")
+    )
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         confirm = request.form.get("confirm_password", "")
+        form_ref_code = (request.form.get("referral_code") or "").strip()
 
         if not name or not email or not password:
             flash("All fields are required.", "error")
-            return render_template("signup.html", email=email)
+            return render_template("signup.html", email=email, referral_code=form_ref_code)
 
         if password != confirm:
             flash("Passwords do not match.", "error")
-            return render_template("signup.html", email=email)
+            return render_template("signup.html", email=email, referral_code=form_ref_code)
 
         if len(password) < 10:
             flash("Password must be at least 10 characters.", "error")
-            return render_template("signup.html", email=email)
+            return render_template("signup.html", email=email, referral_code=form_ref_code)
 
         if User.query.filter_by(email=email).first():
             flash("Email already registered.", "error")
-            return render_template("signup.html", email=email)
+            return render_template("signup.html", email=email, referral_code=form_ref_code)
 
         hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -1408,17 +1415,24 @@ def signup():
             if file.filename:
                 profile_photo = save_upload(file)
 
-        # Resolve the inviter so referred_by is set at row creation. First
-        # try the session cookie set by /invite/<code>; if that's gone (cookie
-        # cleared, different device, aged out), fall back to a GHL contact
-        # lookup by email — the RSVP form persisted invited_by_referral_code
-        # on the contact record, so we can recover attribution from there.
+        # Resolve the inviter so referred_by is set at row creation. Three
+        # paths in priority order:
+        #   1. Form field — the prospect typed/pasted a referral code.
+        #      Belt-and-suspenders for cross-device or different-email cases.
+        #   2. Session cookie set by /invite/<code> (same browser, <30 days).
+        #   3. GHL contact lookup by email — recovers attribution when the
+        #      RSVP'd email matches the signup email.
         referred_by_id = None
-        inviter_id = session.get("referred_by_user_id")
-        if inviter_id:
-            inviter = User.query.get(inviter_id)
+        if form_ref_code:
+            inviter = User.query.filter_by(referral_code=form_ref_code).first()
             if inviter:
                 referred_by_id = inviter.id
+        if referred_by_id is None:
+            inviter_id = session.get("referred_by_user_id")
+            if inviter_id:
+                inviter = User.query.get(inviter_id)
+                if inviter:
+                    referred_by_id = inviter.id
         if referred_by_id is None:
             referred_by_id = _resolve_referrer_from_ghl(email)
 
@@ -1432,6 +1446,10 @@ def signup():
             last_login_date=date.today(),
             referred_by=referred_by_id,
         )
+        # Generate the new member's own referral code at signup so it's
+        # ready to share immediately, instead of lazily on first /referrals
+        # visit. ensure_referral_code() is idempotent.
+        user.ensure_referral_code()
         db.session.add(user)
         db.session.commit()
 
@@ -1446,7 +1464,7 @@ def signup():
         flash("Account created. Complete your membership to gain access.", "success")
         return redirect(url_for("pricing"))
 
-    return render_template("signup.html", email=prefilled_email)
+    return render_template("signup.html", email=prefilled_email, referral_code=prefilled_ref)
 
 
 @app.route("/signup-with-code", methods=["POST"])
@@ -1633,7 +1651,17 @@ def profile(user_id):
             projects_q = projects_q.filter(False)
     projects = projects_q.order_by(Project.updated_at.desc()).all()
 
-    return render_template("profile.html", user=user, posts=posts, projects=projects)
+    # Public "Brothers" stat: total members brought in via this user's
+    # referral link. Counts every account with referred_by = user.id —
+    # not gated by payment status, so the number reflects real-world
+    # influence (anyone they got in the door).
+    brothers_count = User.query.filter_by(referred_by=user.id).count()
+
+    return render_template(
+        "profile.html",
+        user=user, posts=posts, projects=projects,
+        brothers_count=brothers_count,
+    )
 
 
 @app.route("/profile/edit", methods=["GET", "POST"])
@@ -2076,6 +2104,7 @@ def subscription_success():
             subscription_status="active",
             subscription_current_period_end=period_end,
         )
+        user.ensure_referral_code()
         db.session.add(user)
         db.session.commit()
         login_user(user, remember=True)
@@ -2228,6 +2257,32 @@ def _handle_payment_succeeded(data):
                         print(f"[STRIPE] Failed to cancel referrer sub {referrer.stripe_subscription_id}: {e}")
 
     db.session.commit()
+
+    # First-payment notification: when a referee makes their FIRST $99
+    # charge, surface that to their referrer immediately (via in-app
+    # notification + push) so the referrer sees signal long before the
+    # 6-payment qualification milestone. Distinct from `referrer` above,
+    # which is only populated at the qualification moment.
+    if user.payments_made_count == 1 and user.referred_by:
+        first_payment_referrer = User.query.get(user.referred_by)
+        if first_payment_referrer:
+            notif = Notification(
+                user_id=first_payment_referrer.id,
+                type="new_referral",
+                message=f"{user.name} just joined through your link.",
+                link="/referrals",
+            )
+            db.session.add(notif)
+            db.session.commit()
+            try:
+                push_lib.send_push_to_user(
+                    first_payment_referrer.id,
+                    "Sovereign",
+                    f"{user.name} just joined through your link.",
+                    "/referrals",
+                )
+            except Exception as e:
+                print(f"[PUSH] first-payment notify failed: {e}")
 
     # Receipt to the paying user
     amount = data.get("amount_paid", 0) or 0

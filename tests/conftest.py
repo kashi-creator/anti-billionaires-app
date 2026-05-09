@@ -14,7 +14,23 @@ from models import db
 
 @pytest.fixture
 def app():
-    flask_app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
+    # SERVER_NAME lets `url_for(_external=True)` work outside a request
+    # context — needed because the Stripe-webhook handler renders email
+    # templates (which call url_for) inside the synchronous test path.
+    flask_app.config.update(
+        TESTING=True,
+        WTF_CSRF_ENABLED=False,
+        RATELIMIT_ENABLED=False,
+        SERVER_NAME="localhost.test",
+    )
+    # Reset Flask-Limiter state between tests so per-IP/per-route counters
+    # from one test don't trip 429s in the next (e.g. multiple POST /signup
+    # tests would otherwise blow past the "3 per minute" cap).
+    try:
+        from app import limiter
+        limiter.reset()
+    except Exception:
+        pass
     with flask_app.app_context():
         db.drop_all()
         db.create_all()

@@ -41,6 +41,12 @@
                         <span class="stat-label">Streak</span>
                     </div>
                     {% endif %}
+                    {% if brothers_count and brothers_count > 0 %}
+                    <div class="stat-item">
+                        <span class="stat-number stat-gold">{{ brothers_count }}</span>
+                        <span class="stat-label">Brothers</span>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="profile-tier-level">
                     <span class="tier-badge tier-{{ user.tier }}">{{ user.tier_display }}</span>
