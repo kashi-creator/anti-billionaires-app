@@ -338,6 +338,7 @@ def register_meeting_rsvp(
     phone: Optional[str] = None,
     sms_opt_in: bool = False,
     invited_by: Optional[str] = None,
+    invited_by_referral_code: Optional[str] = None,
     rsvp_source: str = "invite-link",
     meeting_date: str = "",
     meeting_time: str = "",
@@ -352,6 +353,12 @@ def register_meeting_rsvp(
     opted in). The actual sends are routed through GHL's Conversations API
     (LC Email + LC Phone) so we don't need a separate SMTP / Twilio account.
 
+    `invited_by` is the inviter's first name (human-readable, not unique).
+    `invited_by_referral_code` is the inviter's machine-friendly id used for
+    reverse-lookup on conversion — when a guest later signs up, the GHL
+    contact still carries this code so we can resolve them back to the right
+    User row even if the session cookie has expired.
+
     Fail-silent: any individual step that errors gets logged but does not
     affect the user-facing route or block subsequent steps.
     """
@@ -363,6 +370,7 @@ def register_meeting_rsvp(
         "sms_opt_in": "true" if sms_opt_in else "false",
         "rsvp_source": rsvp_source,
         "invited_by": invited_by or "",
+        "invited_by_referral_code": invited_by_referral_code or "",
     }
 
     def _run():
@@ -478,3 +486,24 @@ def custom_fields_from_user(user) -> dict:
             if user.lifetime_qualified_at else ""
         ),
     }
+
+
+def sync_referrer_to_ghl(referrer) -> None:
+    """Push the latest referral counters to a referrer's GHL contact card.
+
+    Called from the Stripe payment webhook whenever a referrer's
+    qualified_referrals_count changes (or when they hit lifetime).
+    Lets Kashi see live referral counts in GHL without leaving the CRM.
+
+    Fail-silent (daemon thread inside upsert_contact). If the referrer
+    has no email or GHL is disabled, no-ops cleanly.
+    """
+    if not referrer or not referrer.email:
+        return
+    stage = "lifetime-qualified" if referrer.lifetime_access else "active-member"
+    upsert_contact(
+        email=referrer.email,
+        name=referrer.name or "",
+        stage_tag=stage,
+        custom_fields=custom_fields_from_user(referrer),
+    )

@@ -10,7 +10,8 @@ Custom Values (location-wide, used as merge tags in workflow templates):
 Custom Fields (per-contact data populated by /invite/<code> POST):
   - sms_opt_in
   - rsvp_source
-  - invited_by
+  - invited_by                  (inviter's first name — human-readable)
+  - invited_by_referral_code    (machine-friendly inviter id for reverse-lookup)
 
 Reads GHL_API_KEY and GHL_LOCATION_ID from the environment. Prints what
 exists, what it would create, and (on the live run) what it actually created.
@@ -49,9 +50,10 @@ DESIRED_CUSTOM_VALUES = [
 ]
 
 DESIRED_CUSTOM_FIELDS = [
-    {"name": "sms_opt_in",   "dataType": "TEXT", "model": "contact"},
-    {"name": "rsvp_source",  "dataType": "TEXT", "model": "contact"},
-    {"name": "invited_by",   "dataType": "TEXT", "model": "contact"},
+    {"name": "sms_opt_in",                 "dataType": "TEXT", "model": "contact"},
+    {"name": "rsvp_source",                "dataType": "TEXT", "model": "contact"},
+    {"name": "invited_by",                 "dataType": "TEXT", "model": "contact"},
+    {"name": "invited_by_referral_code",   "dataType": "TEXT", "model": "contact"},
 ]
 
 
@@ -187,7 +189,7 @@ def main():
         print("  1. In GHL Settings → Custom Values, edit meeting_date / meeting_time / ")
         print("     meeting_location with the real next-meeting details.")
         print("  2. Verify the custom field fieldKeys above match what lib/ghl.py sends:")
-        print("     'sms_opt_in', 'rsvp_source', 'invited_by'.")
+        print("     'sms_opt_in', 'rsvp_source', 'invited_by', 'invited_by_referral_code'.")
         print("     If GHL prefixed them (e.g. 'contact.sms_opt_in'), tell Kashi —")
         print("     register_meeting_rsvp() will need the prefixed keys.")
 

@@ -930,7 +930,7 @@ def referrals():
     remaining_to_lifetime = max(0, QUALIFIED_NEEDED_FOR_LIFETIME - qualified_total)
     progress_pct = min(100, int((qualified_total / QUALIFIED_NEEDED_FOR_LIFETIME) * 100))
 
-    referral_url = f"{request.host_url.rstrip('/')}/r/{current_user.referral_code}"
+    referral_url = f"{request.host_url.rstrip('/')}/invite/{current_user.referral_code}"
 
     return render_template(
         'referrals.html',

@@ -3,7 +3,8 @@ import uuid
 import json
 from datetime import datetime, date
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort
+from typing import Optional
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, abort, session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, generate_csrf, validate_csrf, CSRFError
@@ -13,6 +14,7 @@ from werkzeug.utils import secure_filename
 import bcrypt
 import secrets
 import stripe
+import requests
 from datetime import timedelta
 from email_send import (
     send_email, send_welcome_verify, send_password_reset,
@@ -834,6 +836,54 @@ def _post_signup_redirect_url(user):
     return url_for("feed")
 
 
+def _resolve_referrer_from_ghl(email: str) -> Optional[int]:
+    """Reconcile a signup back to its inviter via GHL when the session cookie
+    is gone (different device, expired cookie, cleared browser).
+
+    The /invite POST writes invited_by_referral_code onto the GHL contact at
+    RSVP time. So even weeks later, looking up that contact by email and
+    reading the field gets us back to the right User row. Returns the
+    inviter's User.id, or None on any miss.
+
+    Synchronous: we're inside the signup transaction and need the result
+    before commit. 5-second timeout so a GHL hiccup never breaks signup.
+    Fail-silent on every error path.
+    """
+    api_key = os.environ.get("GHL_API_KEY")
+    location_id = os.environ.get("GHL_LOCATION_ID")
+    if not (api_key and location_id and email):
+        return None
+    try:
+        r = requests.get(
+            "https://services.leadconnectorhq.com/contacts/",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Version": "2021-07-28",
+                "Accept": "application/json",
+            },
+            params={"locationId": location_id, "query": email, "limit": 1},
+            timeout=5,
+        )
+        if r.status_code != 200:
+            return None
+        contacts = (r.json() or {}).get("contacts") or []
+        if not contacts:
+            return None
+        for cf in contacts[0].get("customFields", []) or []:
+            # GHL returns customFields as [{id, value}] OR [{key, value}]
+            # depending on the contact-fetch shape. Match on either.
+            key = cf.get("key") or cf.get("fieldKey") or ""
+            if "invited_by_referral_code" in key:
+                code = (cf.get("value") or "").strip()
+                if not code:
+                    return None
+                inviter = User.query.filter_by(referral_code=code).first()
+                return inviter.id if inviter else None
+    except Exception:
+        return None
+    return None
+
+
 # Endpoints allowed for paying users who haven't yet acknowledged the
 # PWA install step. Any other request from such users is redirected to
 # /welcome/install so they can't bypass the hard step by URL-typing.
@@ -1229,8 +1279,17 @@ def invite_landing(referral_code):
     """
     inviter = User.query.filter_by(referral_code=referral_code).first()
     inviter_name = None
-    if inviter and inviter.name:
-        inviter_name = inviter.name.split()[0]
+    if inviter:
+        if inviter.name:
+            inviter_name = inviter.name.split()[0]
+        # Carry the inviter through to /signup so referred_by gets set if/when
+        # this guest creates an account. Session lifetime is set globally by
+        # PERMANENT_SESSION_LIFETIME (30 days) — long enough that a guest who
+        # RSVPs today and signs up next week is still attributed correctly.
+        # If the cookie ages out, _resolve_referrer_from_ghl is the fallback.
+        session.permanent = True
+        session["referred_by_user_id"] = inviter.id
+        session["referred_by_code"] = inviter.referral_code
     return render_template(
         "invite.html",
         referral_code=referral_code,
@@ -1259,6 +1318,7 @@ def invite_submit(referral_code):
 
     inviter = User.query.filter_by(referral_code=referral_code).first()
     invited_by = inviter.name if inviter else None
+    invited_by_referral_code = inviter.referral_code if inviter else None
 
     settings = MeetingSettings.current()
     allowlist = _admin_email_allowlist()
@@ -1270,6 +1330,7 @@ def invite_submit(referral_code):
         phone=phone,
         sms_opt_in=sms_opt_in,
         invited_by=invited_by,
+        invited_by_referral_code=invited_by_referral_code,
         rsvp_source="invite-link",
         meeting_date=settings.meeting_date,
         meeting_time=settings.meeting_time,
@@ -1347,6 +1408,20 @@ def signup():
             if file.filename:
                 profile_photo = save_upload(file)
 
+        # Resolve the inviter so referred_by is set at row creation. First
+        # try the session cookie set by /invite/<code>; if that's gone (cookie
+        # cleared, different device, aged out), fall back to a GHL contact
+        # lookup by email — the RSVP form persisted invited_by_referral_code
+        # on the contact record, so we can recover attribution from there.
+        referred_by_id = None
+        inviter_id = session.get("referred_by_user_id")
+        if inviter_id:
+            inviter = User.query.get(inviter_id)
+            if inviter:
+                referred_by_id = inviter.id
+        if referred_by_id is None:
+            referred_by_id = _resolve_referrer_from_ghl(email)
+
         user = User(
             name=name,
             email=email,
@@ -1355,9 +1430,15 @@ def signup():
             points=0,
             streak_days=1,
             last_login_date=date.today(),
+            referred_by=referred_by_id,
         )
         db.session.add(user)
         db.session.commit()
+
+        # Clear the invite-session keys so a different signup in the same
+        # browser doesn't inherit a stale referrer.
+        session.pop("referred_by_user_id", None)
+        session.pop("referred_by_code", None)
 
         # Free signup, no card on file — pure prospect (no trial yet).
         ghl.upsert_contact(email=email, name=name, stage_tag="prospect")
@@ -2164,6 +2245,14 @@ def _handle_payment_succeeded(data):
             )
         except Exception as e:
             print(f"[EMAIL] referral progress failed: {e}")
+
+        # Push the updated counter to the referrer's GHL contact so Kashi
+        # can see live referral progress in the CRM. Idempotent with the
+        # lifetime-qualified upsert below — daemon-thread, fail-silent.
+        try:
+            ghl.sync_referrer_to_ghl(referrer)
+        except Exception as e:
+            print(f"[GHL] referrer sync failed: {e}")
 
     # Phase 1: keep custom fields fresh on every successful payment, even when
     # the user did not just unlock their referrer's lifetime. Phase 2 widens
