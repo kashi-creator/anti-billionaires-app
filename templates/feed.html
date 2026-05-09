@@ -316,6 +316,23 @@ function addPollOption() {
     container.appendChild(input);
 }
 
+document.getElementById('postForm')?.addEventListener('submit', function(e) {
+    const btn = this.querySelector('button[type="submit"]');
+    if (!btn || btn.disabled) {
+        e.preventDefault();
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Posting...';
+    // setTimeout lets native form serialization capture values before we wipe the UI
+    setTimeout(() => {
+        document.getElementById('postContent').value = '';
+        clearPreview();
+        const pollCreator = document.getElementById('pollCreator');
+        if (pollCreator) pollCreator.style.display = 'none';
+    }, 50);
+});
+
 function toggleBookmark(postId, btn) {
     fetch(`/bookmark/${postId}`, { method: 'POST' })
         .then(r => r.json())
