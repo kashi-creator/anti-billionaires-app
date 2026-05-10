@@ -223,6 +223,22 @@ def event_rsvp(event_id):
 
         _check_item_by_slug(current_user.id, "rsvp-event")
 
+        if status == "going":
+            try:
+                from email_send import send_event_rsvp_confirmation
+                current_user.ensure_referral_code()
+                db.session.commit()
+                referral_url = url_for(
+                    "features.referral_landing",
+                    code=current_user.referral_code,
+                    _external=True,
+                )
+                send_event_rsvp_confirmation(current_user, event, referral_url)
+            except Exception as e:
+                current_app.logger.warning(
+                    "RSVP confirmation email failed (non-fatal): %s", e
+                )
+
     return redirect(url_for('phase3.event_detail', event_id=event_id))
 
 

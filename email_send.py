@@ -155,3 +155,17 @@ def send_weekly_digest(user, digest_data):
         template="weekly_digest",
         context={"user": user, **digest_data},
     )
+
+
+def send_event_rsvp_confirmation(user, event, referral_url):
+    return send_email(
+        to=user.email,
+        subject=f"You're going. {event.title}, {event.date.strftime('%B %d')}",
+        template="event_rsvp_confirmation",
+        context={
+            "user": user,
+            "event": event,
+            "referral_url": referral_url,
+            "event_date_long": event.date.strftime("%A, %B %d, %Y"),
+        },
+    )

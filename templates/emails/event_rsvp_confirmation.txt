@@ -1,0 +1,27 @@
+{{ user.name }},
+
+You're going.
+
+{{ event.title }}
+{{ event_date_long }}{% if event.time %} - {{ event.time }}{% endif %}
+{% if event.location %}{{ event.location }}
+{% endif %}
+{% if event.description %}
+{{ event.description }}
+
+{% endif %}
+---
+
+Bring your brothers.
+
+The Society grows by one introduction at a time. If you know a man who'd
+belong in the room, send him this link. He shows up through your line, you
+both move closer to the lifetime threshold.
+
+Your invite link:
+{{ referral_url }}
+
+---
+
+See you there.
+Sovereign Society

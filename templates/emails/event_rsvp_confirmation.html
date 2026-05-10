@@ -1,0 +1,38 @@
+{% extends "emails/_layout.html" %}
+{% block content %}
+<h1 style="font-family:Georgia,serif;font-size:32px;color:#D4AF37;margin:0 0 16px 0;text-align:center;">You're going.</h1>
+<p style="text-align:center;font-size:13px;color:#D4AF37;letter-spacing:3px;text-transform:uppercase;margin:0 0 32px 0;">RSVP confirmed</p>
+
+<p>{{ user.name }},</p>
+
+<p>Your seat is held for the following.</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;border-left:2px solid #D4AF37;">
+  <tr><td style="padding:4px 0 4px 16px;">
+    <div style="font-family:Georgia,serif;font-size:20px;color:#E8E8E8;margin-bottom:8px;">{{ event.title }}</div>
+    <div style="color:#D4AF37;font-size:14px;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">{{ event_date_long }}{% if event.time %} &middot; {{ event.time }}{% endif %}</div>
+    {% if event.location %}<div style="color:#888;font-size:14px;">{{ event.location }}</div>{% endif %}
+  </td></tr>
+</table>
+
+{% if event.description %}
+<p style="color:#bbb;font-size:14px;line-height:1.6;">{{ event.description }}</p>
+{% endif %}
+
+<hr style="border:none;border-top:1px solid #1f1f1f;margin:32px 0;">
+
+<h2 style="font-family:Georgia,serif;font-size:22px;color:#D4AF37;margin:0 0 12px 0;">Bring your brothers.</h2>
+
+<p>The Society grows by one introduction at a time. If you know a man who'd belong in the room, send him this link. He shows up through your line, you both move closer to the lifetime threshold.</p>
+
+<p style="margin:24px 0;text-align:center;">
+  <a href="{{ referral_url }}" style="display:inline-block;background:#D4AF37;color:#0A0A0A;padding:14px 32px;text-decoration:none;font-weight:bold;letter-spacing:2px;text-transform:uppercase;font-size:13px;border-radius:4px;">Your invite link</a>
+</p>
+
+<p style="font-family:'Courier New',monospace;font-size:13px;color:#888;text-align:center;word-break:break-all;">{{ referral_url }}</p>
+
+<hr style="border:none;border-top:1px solid #1f1f1f;margin:32px 0;">
+
+<p>See you there.</p>
+<p style="margin-top:24px;color:#888;">Sovereign Society</p>
+{% endblock %}
