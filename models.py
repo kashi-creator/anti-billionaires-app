@@ -405,6 +405,9 @@ RECURRENCE_RULES = frozenset({
     "none",
     "every_thursday",
     "first_and_last_thursday_monthly",
+    # 'manual' templates are not processed by _generate_upcoming_occurrences;
+    # their child occurrences are seeded by hand (see _seed_content).
+    "manual",
 })
 
 
@@ -444,7 +447,9 @@ class Event(db.Model):
     @validates("recurrence_rule")
     def _validate_recurrence_rule(self, key, value):
         if value not in RECURRENCE_RULES:
-            raise ValueError(f"invalid recurrence_rule: {value!r}")
+            raise ValueError(
+                f"recurrence_rule must be in {sorted(RECURRENCE_RULES)}, got {value!r}"
+            )
         return value
 
     @property

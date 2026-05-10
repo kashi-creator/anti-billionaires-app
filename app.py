@@ -365,6 +365,10 @@ def _generate_upcoming_occurrences(template, weeks_ahead=8):
     rule = template.recurrence_rule
     if rule == "none":
         return 0
+    # Templates with rule='manual' are seeded by hand in _seed_content (e.g. the
+    # St. Pete chapter biweekly's 6 canonical dates) — never auto-generated here.
+    if rule == "manual":
+        return 0
 
     today = date.today()
     horizon = today + timedelta(weeks=weeks_ahead)
@@ -511,19 +515,28 @@ def _seed_content():
         db.session.flush()
         return template
 
+    st_pete_description = (
+        "Sovereign Society's St. Petersburg chapter biweekly meetup. Every other Thursday at 6:30 PM EST. "
+        "Brotherhood, accountability, and discussion. Open to all members."
+    )
+    st_pete_location = "The Temple, 155 8th Street North, Saint Petersburg, FL 33701"
     st_pete_template = _seed_recurring_template(
         title="St. Petersburg Chapter Biweekly",
-        description=(
-            "Sovereign Society's St. Petersburg chapter biweekly meetup. The 1st and last Thursday of every month. "
-            "Brotherhood, accountability, and discussion. Open to all members."
-        ),
+        description=st_pete_description,
         anchor_date=st_pete_anchor,
         time="6:30 PM EST",
-        location="The Temple, 155 8th Street North, Saint Petersburg, FL 33701",
+        location=st_pete_location,
         event_type="chapter_recurring",
         chapter="St. Petersburg, FL",
-        recurrence_rule="first_and_last_thursday_monthly",
+        recurrence_rule="manual",
     )
+    # Phase 13 self-heal: legacy template was created with first_and_last_thursday_monthly
+    # which doesn't match kashi's actual cadence. Coerce to manual + refresh copy.
+    st_pete_template.recurrence_rule = "manual"
+    st_pete_template.description = st_pete_description
+    st_pete_template.time = "6:30 PM EST"
+    st_pete_template.location = st_pete_location
+
     lunch_template = _seed_recurring_template(
         title="Thursday Group Lunch",
         description=(
@@ -539,8 +552,56 @@ def _seed_content():
     )
     db.session.commit()
 
-    # Materialize the next 8 weeks of occurrences for both templates.
-    _generate_upcoming_occurrences(st_pete_template, weeks_ahead=8)
+    # Phase 13: hand-seed the 6 canonical St. Pete biweekly dates kashi locked
+    # 2026-05-09. Wipe wrong-date children left over from the prior recurrence
+    # rule, then idempotently insert the canonical occurrences. Future cohorts
+    # require updating this set + redeploy until a chapter-management UI ships.
+    canonical_st_pete_dates = {
+        date(2026, 5, 14),
+        date(2026, 5, 28),
+        date(2026, 6, 11),
+        date(2026, 6, 25),
+        date(2026, 7, 9),
+        date(2026, 7, 23),
+    }
+    stale_pete_children = Event.query.filter(
+        Event.recurrence_parent_id == st_pete_template.id,
+        ~Event.date.in_(canonical_st_pete_dates),
+    ).all()
+    for s in stale_pete_children:
+        EventRSVP.query.filter_by(event_id=s.id).delete()
+        db.session.delete(s)
+    if stale_pete_children:
+        db.session.flush()
+    for d in sorted(canonical_st_pete_dates):
+        existing = Event.query.filter_by(
+            recurrence_parent_id=st_pete_template.id,
+            date=d,
+        ).first()
+        if existing:
+            existing.time = "6:30 PM EST"
+            existing.location = st_pete_location
+            continue
+        child = Event(
+            title=st_pete_template.title,
+            description=st_pete_template.description,
+            date=d,
+            time="6:30 PM EST",
+            location=st_pete_location,
+            host_id=st_pete_template.host_id,
+            cover_image=st_pete_template.cover_image,
+            event_type="chapter_recurring",
+            chapter=st_pete_template.chapter,
+            recurrence_rule="none",
+            recurrence_parent_id=st_pete_template.id,
+            is_recurrence_template=False,
+        )
+        db.session.add(child)
+
+    # Materialize the next 8 weeks of Thursday Group Lunch occurrences.
+    # St. Pete template uses recurrence_rule='manual' — _generate_upcoming_occurrences
+    # is a no-op on it; would-be auto-spawned dates would otherwise diverge from
+    # the canonical set above.
     _generate_upcoming_occurrences(lunch_template, weeks_ahead=8)
     db.session.commit()
 
