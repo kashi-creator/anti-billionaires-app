@@ -107,3 +107,41 @@ looks organic, not bulk-loaded.
 points awards (`User.add_points`), no checklist auto-checks
 (`_check_item_by_slug`), no notifications, no GHL pushes. Members do
 NOT get notification spam when this script runs.
+
+## `team_post_enqueue.py`
+
+Phase 14 — append Sovereign Society Team posts to the cron queue
+(`team_post_queue` table). The daily `flask cron team-post-publish` cron
+drains the queue at an every-other-day cadence per Space
+(`TEAM_POST_CADENCE_DAYS` env, default 2). Future content only — does
+NOT touch the 123 backdated Team posts in the `post` table from the
+Phase 12 reseed.
+
+Three input modes:
+
+```bash
+# Single post via stdin
+echo "Post body..." | python scripts/team_post_enqueue.py --space "Sovereign Wealth"
+
+# Single post from a file
+python scripts/team_post_enqueue.py --space "Body & Iron" --file path/to/post.txt
+
+# Bulk (one post per '=====' separator, matches seed_content/*.txt format)
+python scripts/team_post_enqueue.py --space "Off Grid" --bulk-file seed_content/off_grid_posts.txt
+
+# Production (against Railway Postgres)
+PUBLIC_DB=$(railway variables --service Postgres --json | python3 -c "import json,sys; print(json.load(sys.stdin)['DATABASE_PUBLIC_URL'])")
+railway run sh -c "DATABASE_URL='$PUBLIC_DB' .venv/bin/python scripts/team_post_enqueue.py --space \"Off Grid\" --bulk-file seed_content/off_grid_posts.txt"
+```
+
+Bulk mode strips leading `#` header comment lines from each chunk
+(matches the `seed_content/*.txt` format from Phase 12). Queue ordering
+is FIFO per Space — each new row is appended at
+`queue_position = max(existing pos) + 1`. The cron draws strictly by
+`(queue_position ASC, created_at ASC)`. Published rows are retained
+(status flips `pending` → `published` with `published_post_id` +
+`published_at` populated for audit).
+
+Inspect queue state via `/admin/team-queue` (per-Space pending count +
+last-published + skip-next control). Edit/delete a specific row via
+`flask shell` if needed.

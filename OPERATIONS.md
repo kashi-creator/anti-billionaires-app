@@ -111,6 +111,21 @@ Sends a "Resend wired up?" test to the first admin user.
 2. Schedule: `0 9 * * 0` (Sundays 9am UTC)
 3. Command: `flask cron digest`
 
+### Schedule team-post-publish in Railway
+1. Railway → New Cron Job
+2. Schedule: `0 13 * * *` (daily at 13:00 UTC = 9 AM ET / 8 AM EDT)
+3. Command: `flask cron team-post-publish`
+
+Cadence: `TEAM_POST_CADENCE_DAYS` env var (default 2 = every other day). To
+change to weekly, set 7. Within the cron command, the per-Space cadence
+check ensures no Space gets a post twice per cadence even if the cron
+itself runs daily.
+
+Append posts to the queue with `scripts/team_post_enqueue.py` (single
+post via stdin/--file, or bulk via --bulk-file with `=====`-separated
+chunks). The queue is FIFO per-Space (by `queue_position` asc); published
+rows are retained for audit (status flips `pending` → `published`).
+
 ### Rotate SECRET_KEY (only if compromised)
 - This invalidates all sessions; everyone gets logged out
 - Generate new: `python -c "import secrets; print(secrets.token_hex(32))"`
