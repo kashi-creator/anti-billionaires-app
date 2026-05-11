@@ -7,6 +7,7 @@ Designed to be called from Railway Cron Jobs (or similar) via:
 Also exposes Python helpers used inline by route handlers
 (e.g. notify_dm_throttled in features_routes.send_message).
 """
+import os
 from datetime import datetime, timedelta
 import click
 from flask.cli import AppGroup
@@ -309,3 +310,85 @@ def cli_reconcile(dry_run):
     Stripe, and re-pushes custom fields to GHL contact records. Idempotent.
     """
     run_nightly_reconcile(dry_run=dry_run)
+
+
+# ===== Team auto-post queue (Phase 14) =====
+#
+# The Sovereign Society Team user (prod id=11, email team@sovereignsociety.rich)
+# publishes one queued post to each Space at an every-other-day cadence
+# (TEAM_POST_CADENCE_DAYS env var, default 2). Cron runs daily; the
+# per-Space cadence check prevents double-firing.
+#
+# - Strict FIFO by (queue_position ASC, created_at ASC).
+# - One post per Space per cron run, at most.
+# - Reads "last team post" from the `post` table (not the queue) — so the
+#   123 backdated Phase 12 posts naturally respect cadence too.
+# - Does NOT fire notifications, GHL pushes, or engagement tagging.
+# - Does NOT delete published queue rows; transitions pending → published
+#   with `published_post_id` + `published_at` set for audit.
+
+@cron_cli.command("team-post-publish")
+def cli_team_post_publish():
+    """Publish next-in-queue Team posts for each Space whose cadence is up.
+
+    Cadence: TEAM_POST_CADENCE_DAYS env var (default 2). A Space gets a new
+    post only if its most recent Team post is older than that.
+    """
+    from models import Space, Post, TeamPostQueue
+
+    team = User.query.filter_by(email="team@sovereignsociety.rich").first()
+    if not team:
+        click.echo("[TEAM-POST] Team user (team@sovereignsociety.rich) not found. Aborting.")
+        return
+
+    cadence = int(os.environ.get("TEAM_POST_CADENCE_DAYS", "2"))
+    cadence_delta = timedelta(days=cadence)
+    now = datetime.utcnow()
+    threshold = now - cadence_delta
+
+    published = 0
+    skipped_too_recent = 0
+    skipped_empty_queue = 0
+
+    for space in Space.query.order_by(Space.id).all():
+        last = (
+            Post.query
+            .filter_by(user_id=team.id, space_id=space.id)
+            .order_by(Post.created_at.desc())
+            .first()
+        )
+        if last and last.created_at and last.created_at > threshold:
+            skipped_too_recent += 1
+            continue
+
+        next_q = (
+            TeamPostQueue.query
+            .filter_by(space_id=space.id, status="pending")
+            .order_by(TeamPostQueue.queue_position.asc(), TeamPostQueue.created_at.asc())
+            .first()
+        )
+        if not next_q:
+            skipped_empty_queue += 1
+            continue
+
+        p = Post(
+            user_id=team.id,
+            space_id=space.id,
+            content=next_q.content,
+            created_at=now,
+            updated_at=now,
+        )
+        db.session.add(p)
+        db.session.flush()  # populate p.id before linking
+        next_q.status = "published"
+        next_q.published_post_id = p.id
+        next_q.published_at = now
+        published += 1
+        preview = next_q.content[:70].replace("\n", " ")
+        click.echo(f"[TEAM-POST] published in {space.name!r}: {preview!r}")
+
+    db.session.commit()
+    click.echo(
+        f"[TEAM-POST] cadence={cadence}d  published={published}  "
+        f"skipped_recent={skipped_too_recent}  skipped_empty={skipped_empty_queue}"
+    )

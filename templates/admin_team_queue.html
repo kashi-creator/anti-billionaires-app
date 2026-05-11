@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Team Post Queue — Admin{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px;margin:32px auto;padding:0 24px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="font-family:'Cormorant Garamond',Georgia,serif;color:#D4AF37;font-size:42px;margin:0;">Team Post Queue</h1>
+    <a href="{{ url_for('admin_panel') }}" style="color:#888;text-decoration:none;font-size:13px;">&larr; Admin</a>
+  </div>
+
+  <p style="color:#888;font-size:13px;line-height:1.7;margin-bottom:24px;">
+    Sovereign Society Team posts publish per-Space on an every-other-day cadence
+    via <code style="color:#D4AF37;">flask cron team-post-publish</code> (daily at 13:00 UTC).
+    A Space only gets a new post if its most recent Team post is older than
+    <strong style="color:#D4AF37;">{{ cadence }} day{{ 's' if cadence != 1 else '' }}</strong>
+    (env: <code style="color:#D4AF37;">TEAM_POST_CADENCE_DAYS</code>).
+    {% if not team_user %}
+    <br><span style="color:#ff9966;">Warning: Team user (<code>team@sovereignsociety.rich</code>) not found in DB. Cron will no-op.</span>
+    {% endif %}
+  </p>
+
+  <div style="background:#111;border:1px solid #1f1f1f;border-radius:8px;overflow:hidden;margin-bottom:32px;">
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <thead style="background:#0a0a0a;color:#888;font-size:11px;text-transform:uppercase;letter-spacing:2px;">
+        <tr>
+          <th style="text-align:left;padding:12px 16px;">Space</th>
+          <th style="text-align:right;padding:12px 16px;">Pending</th>
+          <th style="text-align:right;padding:12px 16px;">Published</th>
+          <th style="text-align:left;padding:12px 16px;">Last Team Post</th>
+          <th style="text-align:left;padding:12px 16px;">Next In Queue</th>
+          <th style="text-align:right;padding:12px 16px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr style="border-top:1px solid #1f1f1f;">
+          <td style="padding:14px 16px;color:#fff;font-weight:bold;">{{ row.space.name }}</td>
+          <td style="padding:14px 16px;text-align:right;">
+            {% if row.pending_count > 0 %}
+              <span style="color:#D4AF37;font-weight:bold;">{{ row.pending_count }}</span>
+            {% else %}
+              <span style="color:#666;">0</span>
+            {% endif %}
+          </td>
+          <td style="padding:14px 16px;text-align:right;color:#888;">{{ row.published_count }}</td>
+          <td style="padding:14px 16px;color:#888;font-size:12px;">
+            {% if row.last_team_post_at %}
+              {{ row.last_team_post_at.strftime('%b %d, %Y %H:%M UTC') }}
+            {% else %}
+              <span style="color:#666;">never</span>
+            {% endif %}
+          </td>
+          <td style="padding:14px 16px;color:#aaa;font-size:12px;max-width:340px;">
+            {% if row.next_pending %}
+              <span style="color:#666;">#{{ row.next_pending.id }} (pos {{ row.next_pending.queue_position }})</span><br>
+              {{ row.next_pending.content[:120] }}{% if row.next_pending.content|length > 120 %}…{% endif %}
+            {% else %}
+              <span style="color:#666;">empty</span>
+            {% endif %}
+          </td>
+          <td style="padding:14px 16px;text-align:right;">
+            {% if row.next_pending %}
+            <form method="POST" action="{{ url_for('admin_team_queue_skip', space_id=row.space.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Skip the next pending post in {{ row.space.name|e }}? It will be marked skipped (not deleted) and the next cron run will draw the row after it.');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit"
+                      style="background:transparent;color:#ff9966;border:1px solid #2a2a2a;padding:6px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;">
+                Skip next
+              </button>
+            </form>
+            {% else %}
+              <span style="color:#444;font-size:11px;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="padding:20px;background:#0a0a0a;border:1px solid #1f1f1f;border-radius:8px;color:#888;font-size:13px;line-height:1.7;">
+    <strong style="color:#D4AF37;font-size:11px;letter-spacing:3px;text-transform:uppercase;display:block;margin-bottom:12px;">Enqueue more</strong>
+    Use <code style="color:#D4AF37;">scripts/team_post_enqueue.py</code> to append posts. Single via stdin:
+    <pre style="margin:8px 0;padding:12px;background:#000;border:1px solid #1f1f1f;border-radius:4px;color:#D4AF37;font-size:12px;overflow-x:auto;">echo "Body..." | python scripts/team_post_enqueue.py --space "Sovereign Wealth"</pre>
+    Bulk (one post per <code style="color:#D4AF37;">=====</code> separator):
+    <pre style="margin:8px 0;padding:12px;background:#000;border:1px solid #1f1f1f;border-radius:4px;color:#D4AF37;font-size:12px;overflow-x:auto;">python scripts/team_post_enqueue.py --space "Off Grid" --bulk-file seed_content/off_grid_posts.txt</pre>
+    Edit / delete a specific row via <code style="color:#D4AF37;">flask shell</code>:
+    <pre style="margin:8px 0;padding:12px;background:#000;border:1px solid #1f1f1f;border-radius:4px;color:#aaa;font-size:12px;overflow-x:auto;">&gt;&gt;&gt; q = TeamPostQueue.query.get(123)
+&gt;&gt;&gt; q.content = "..."   # or db.session.delete(q)
+&gt;&gt;&gt; db.session.commit()</pre>
+  </div>
+</div>
+{% endblock %}

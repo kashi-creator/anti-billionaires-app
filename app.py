@@ -34,6 +34,7 @@ from models import (
     AssessmentResponse,
     Project,
     MeetingSettings,
+    TeamPostQueue,
 )
 from phase3_routes import phase3, seed_checklist
 from features_routes import features, seed_badges, check_and_award_badges
@@ -2577,6 +2578,85 @@ def admin_meeting_settings():
         flash("Meeting details updated. New RSVPs will use these values.", "success")
         return redirect(url_for("admin_meeting_settings"))
     return render_template("admin_meeting.html", settings=settings)
+
+
+# ===== TEAM POST QUEUE (Phase 14) =====
+
+@app.route("/admin/team-queue")
+@admin_required
+def admin_team_queue():
+    """Per-Space view of the Sovereign Society Team post queue.
+
+    Shows pending counts + last-published-at + a 'skip next' control per
+    Space. Edit/delete UI not included — admins handle those via
+    `flask shell` if needed.
+    """
+    team = User.query.filter_by(email="team@sovereignsociety.rich").first()
+    rows = []
+    for space in Space.query.order_by(Space.id).all():
+        pending_count = (
+            TeamPostQueue.query
+            .filter_by(space_id=space.id, status="pending")
+            .count()
+        )
+        published_count = (
+            TeamPostQueue.query
+            .filter_by(space_id=space.id, status="published")
+            .count()
+        )
+        # "Last published" = most recent Team post in `post` table, NOT the
+        # queue — because the 123 Phase 12 backdated posts predate the queue
+        # but still count toward cadence.
+        last_team_post = None
+        if team:
+            last_team_post = (
+                Post.query
+                .filter_by(user_id=team.id, space_id=space.id)
+                .order_by(Post.created_at.desc())
+                .first()
+            )
+        next_pending = (
+            TeamPostQueue.query
+            .filter_by(space_id=space.id, status="pending")
+            .order_by(TeamPostQueue.queue_position.asc(), TeamPostQueue.created_at.asc())
+            .first()
+        )
+        rows.append({
+            "space": space,
+            "pending_count": pending_count,
+            "published_count": published_count,
+            "last_team_post_at": last_team_post.created_at if last_team_post else None,
+            "next_pending": next_pending,
+        })
+    cadence = int(os.environ.get("TEAM_POST_CADENCE_DAYS", "2"))
+    return render_template(
+        "admin_team_queue.html",
+        rows=rows,
+        cadence=cadence,
+        team_user=team,
+    )
+
+
+@app.route("/admin/team-queue/skip/<int:space_id>", methods=["POST"])
+@admin_required
+@require_csrf
+def admin_team_queue_skip(space_id):
+    """Mark the next pending queue row for `space_id` as `skipped` without
+    publishing. Idempotent if no pending row exists."""
+    next_pending = (
+        TeamPostQueue.query
+        .filter_by(space_id=space_id, status="pending")
+        .order_by(TeamPostQueue.queue_position.asc(), TeamPostQueue.created_at.asc())
+        .first()
+    )
+    if not next_pending:
+        flash("No pending posts to skip in that Space.", "warning")
+        return redirect(url_for("admin_team_queue"))
+    next_pending.status = "skipped"
+    db.session.commit()
+    preview = next_pending.content[:60].replace("\n", " ")
+    flash(f"Skipped queued post #{next_pending.id}: {preview!r}", "success")
+    return redirect(url_for("admin_team_queue"))
 
 
 # ===== THE VAULT (lessons alias) =====
