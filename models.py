@@ -1237,3 +1237,37 @@ class MeetingSettings(db.Model):
             "stripe_link": "Stripe (card)",
             "custom_link": "External link",
         }.get(self.method_type, self.method_type)
+
+
+# ============ TEAM POST QUEUE (Phase 14) ============
+# Pending future Team posts per Space. Cron drains FIFO on cadence.
+# Existing 123 backdated Team posts (Phase 12 reseed) live in `post` table —
+# this queue is ONLY for future content. See SoT §9 entries 2026-05-11.
+
+TEAM_POST_QUEUE_STATUSES = frozenset({"pending", "published", "skipped"})
+
+
+class TeamPostQueue(db.Model):
+    __tablename__ = "team_post_queue"
+
+    id = db.Column(db.Integer, primary_key=True)
+    space_id = db.Column(db.Integer, db.ForeignKey("space.id"), nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    # Ordering hint within a space. Cron is strict FIFO by (queue_position, created_at).
+    queue_position = db.Column(db.Integer, nullable=False, default=0)
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    published_post_id = db.Column(db.Integer, db.ForeignKey("post.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    space = db.relationship("Space")
+    published_post = db.relationship("Post", foreign_keys=[published_post_id])
+
+    @validates("status")
+    def _validate_status(self, key, value):
+        if value not in TEAM_POST_QUEUE_STATUSES:
+            raise ValueError(
+                f"team_post_queue.status must be in "
+                f"{sorted(TEAM_POST_QUEUE_STATUSES)}, got {value!r}"
+            )
+        return value
