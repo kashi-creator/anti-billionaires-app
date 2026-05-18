@@ -553,17 +553,15 @@ def _seed_content():
     )
     db.session.commit()
 
-    # Phase 13: hand-seed the 6 canonical St. Pete biweekly dates kashi locked
-    # 2026-05-09. Wipe wrong-date children left over from the prior recurrence
-    # rule, then idempotently insert the canonical occurrences. Future cohorts
-    # require updating this set + redeploy until a chapter-management UI ships.
+    # Phase 13: hand-seed canonical St. Pete biweekly dates. Wipe wrong-date
+    # children left over from prior recurrence rule, then idempotently insert
+    # the canonical occurrences. Future cohorts require updating this set +
+    # redeploy until a chapter-management UI ships.
+    # 2026-05-17 update: kashi traveling 5/28; cadence shifts to Jun 4 anchor.
     canonical_st_pete_dates = {
-        date(2026, 5, 14),
-        date(2026, 5, 28),
-        date(2026, 6, 11),
-        date(2026, 6, 25),
-        date(2026, 7, 9),
-        date(2026, 7, 23),
+        date(2026, 6, 4),
+        date(2026, 6, 18),
+        date(2026, 7, 2),
     }
     stale_pete_children = Event.query.filter(
         Event.recurrence_parent_id == st_pete_template.id,
