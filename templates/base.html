@@ -205,6 +205,9 @@
                         <a href="{{ url_for('features.deals') }}" class="avatar-dd-item">My Deals</a>
                         <a href="{{ url_for('features.projects') }}" class="avatar-dd-item">Projects</a>
                         <a href="{{ url_for('features.referrals') }}" class="avatar-dd-item">Referrals</a>
+                        <a href="{{ url_for('features.wins') }}" class="avatar-dd-item">Wins</a>
+                        <a href="{{ url_for('features.challenges') }}" class="avatar-dd-item">Challenges</a>
+                        <a href="{{ url_for('features.resources') }}" class="avatar-dd-item">Resources</a>
                         {% if current_user.has_active_subscription %}
                         <form method="POST" action="{{ url_for('billing_portal') }}">
                             <button type="submit" class="avatar-dd-item avatar-dd-btn">Manage Billing</button>
