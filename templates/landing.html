@@ -357,51 +357,6 @@
     letter-spacing: -0.005em;
   }
 
-  /* TIERS */
-  .tiers-head h2 {
-    font-family: var(--serif);
-    font-weight: 300;
-    font-size: clamp(40px, 6vw, 80px);
-    line-height: 1.05;
-    margin-bottom: 24px;
-    max-width: 800px;
-  }
-  .tiers-head p { color: var(--ink-soft); max-width: 560px; margin-bottom: 64px; }
-  .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
-  .tier {
-    border: 1px solid var(--line);
-    padding: 40px 28px;
-    background: var(--bg);
-    transition: border-color 0.3s, transform 0.3s;
-    position: relative;
-  }
-  .tier:hover { border-color: var(--line-strong); transform: translateY(-4px); }
-  .tier-name {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 24px;
-  }
-  .tier-title {
-    font-family: var(--serif);
-    font-weight: 300;
-    font-size: 36px;
-    color: var(--ink);
-    margin-bottom: 24px;
-    line-height: 1;
-  }
-  .tier ul { list-style: none; }
-  .tier li {
-    font-size: 13px;
-    color: var(--ink-soft);
-    padding: 10px 0;
-    border-top: 1px solid var(--line);
-    line-height: 1.5;
-  }
-  .tier li:first-child { border-top: 0; }
-
   /* PROOF */
   .proof-head h2 {
     font-family: var(--serif);
@@ -535,7 +490,6 @@
     .hero-logo { width: 96px; margin-bottom: 24px; }
     .cta-seal { width: 84px; margin-bottom: 24px; }
     .pillar { padding: 36px 24px; }
-    .tier { padding: 32px 24px; }
     .quote { padding: 32px 24px; }
     .scroll-cue { display: none; }
   }
@@ -562,10 +516,9 @@
   <div class="hud-chapters">
     <a data-target="manifesto">01 Manifesto</a>
     <a data-target="pillars">02 The Work</a>
-    <a data-target="tiers">03 Tiers</a>
     <!-- Voices nav link hidden until real testimonials exist -->
-    <!-- <a data-target="proof">04 Voices</a> -->
-    <a data-target="faq">05 FAQ</a>
+    <!-- <a data-target="proof">03 Voices</a> -->
+    <a data-target="faq">04 FAQ</a>
   </div>
   <a href="{{ url_for('login') }}" class="hud-cta">Sign in</a>
 </nav>
@@ -622,41 +575,10 @@
   </ul>
 </section>
 
-<!-- 03 / TIERS -->
-<section class="chapter tiers-section" id="tiers">
-  <div class="tiers-head">
-    <div class="chapter-meta reveal"><span class="chapter-num">03</span><span class="chapter-tag">Membership</span></div>
-    <h2 class="reveal delay-1">You earn your<br><em>seat</em> at the table.</h2>
-    <p class="reveal delay-2">Every member starts at Bronze. Every tier is earned by showing up, contributing, and standing out. No one buys their way to the top.</p>
-  </div>
-  <div class="tiers">
-    <div class="tier reveal">
-      <div class="tier-name">Tier I</div>
-      <div class="tier-title">Bronze</div>
-      <ul><li>Full feed access</li><li>All Spaces</li><li>Direct messaging</li><li>Wins Wall</li></ul>
-    </div>
-    <div class="tier reveal delay-1">
-      <div class="tier-name">Tier II</div>
-      <div class="tier-title">Silver</div>
-      <ul><li>Everything in Bronze</li><li>Deal Board access</li><li>Resource Vault</li><li>Weekly challenges</li></ul>
-    </div>
-    <div class="tier reveal delay-2">
-      <div class="tier-name">Tier III</div>
-      <div class="tier-title">Gold</div>
-      <ul><li>Everything in Silver</li><li>Mastermind calls</li><li>Member spotlight eligible</li><li>Call booking with members</li></ul>
-    </div>
-    <div class="tier reveal delay-3">
-      <div class="tier-name">Tier IV</div>
-      <div class="tier-title">Platinum</div>
-      <ul><li>Everything in Gold</li><li>The Boardroom</li><li>AI Wingman priority</li><li>Founder access</li></ul>
-    </div>
-  </div>
-</section>
-
-<!-- 04 / PROOF — hidden until real testimonials exist. Keep markup intact for easy re-enable. -->
+<!-- 03 / PROOF — hidden until real testimonials exist. Keep markup intact for easy re-enable. -->
 <section class="chapter proof-section" id="proof" style="display:none;">
   <div class="proof-head">
-    <div class="chapter-meta reveal"><span class="chapter-num">04</span><span class="chapter-tag">Voices</span></div>
+    <div class="chapter-meta reveal"><span class="chapter-num">03</span><span class="chapter-tag">Voices</span></div>
     <h2 class="reveal delay-1">From the <em>brothers</em> who built it.</h2>
   </div>
   <div class="quotes">
@@ -666,19 +588,19 @@
     </div>
     <div class="quote reveal delay-1">
       <div class="quote-body">I joined for the network. I stayed for the men. The accountability alone is worth the membership ten times over.</div>
-      <div class="quote-attr">D., Founder, NYC<div class="quote-attr-role">Gold tier</div></div>
+      <div class="quote-attr">D., Founder, NYC<div class="quote-attr-role">Founding member</div></div>
     </div>
     <div class="quote reveal delay-2">
       <div class="quote-body">No LinkedIn vibes. No soft men. Just real operators trading frameworks and pulling each other up. This is what brotherhood used to mean.</div>
-      <div class="quote-attr">J., Investor, Florida<div class="quote-attr-role">Platinum tier</div></div>
+      <div class="quote-attr">J., Investor, Florida<div class="quote-attr-role">Founding member</div></div>
     </div>
   </div>
 </section>
 
-<!-- 05 / FAQ -->
+<!-- 04 / FAQ -->
 <section class="chapter faq-section" id="faq">
   <div class="faq-head">
-    <div class="chapter-meta reveal"><span class="chapter-num">05</span><span class="chapter-tag">Questions</span></div>
+    <div class="chapter-meta reveal"><span class="chapter-num">04</span><span class="chapter-tag">Questions</span></div>
     <h2 class="reveal delay-1">Before you <em>apply.</em></h2>
   </div>
   <div class="faq-list reveal delay-2">
@@ -690,10 +612,10 @@
   </div>
 </section>
 
-<!-- 06 / FINAL CTA -->
+<!-- 05 / FINAL CTA -->
 <section class="chapter cta-final" id="cta">
   <img src="{{ url_for('static', filename='img/sovereign-logo.png') }}" alt="" class="cta-seal reveal" aria-hidden="true">
-  <div class="chapter-meta reveal delay-1" style="justify-content:center;"><span class="chapter-num">06</span><span class="chapter-tag">The Door</span></div>
+  <div class="chapter-meta reveal delay-1" style="justify-content:center;"><span class="chapter-num">05</span><span class="chapter-tag">The Door</span></div>
   <h2 class="reveal delay-2">The door is <em>open.</em><br>Walk through it.</h2>
   <p class="cta-final-sub reveal delay-3">If you're still reading, you already know. The Society does not sell. It selects. Apply, pay, show up, and stand among men who refuse to be average.</p>
   <div class="hero-ctas reveal delay-4" style="justify-content:center;">
@@ -777,7 +699,7 @@
   (function() {
     const hud = document.getElementById('hud');
     const chapters = document.querySelectorAll('.hud-chapters a');
-    const sections = ['manifesto', 'pillars', 'tiers', 'proof', 'faq'];
+    const sections = ['manifesto', 'pillars', 'proof', 'faq'];
 
     window.addEventListener('scroll', () => {
       hud.classList.toggle('scrolled', window.scrollY > 60);
