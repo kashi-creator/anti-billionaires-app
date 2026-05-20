@@ -78,32 +78,12 @@ def events():
     db.session.commit()
 
     today = date.today()
-    upcoming_chapter = Event.query.filter(
+    upcoming_events = Event.query.filter(
         Event.is_recurrence_template == False,
-        Event.event_type == "chapter_recurring",
         Event.date >= today,
-    ).order_by(Event.chapter.asc(), Event.date.asc()).all()
-    upcoming_weekly = Event.query.filter(
-        Event.is_recurrence_template == False,
-        Event.event_type == "weekly_recurring",
-        Event.date >= today,
-    ).order_by(Event.date.asc()).all()
-    upcoming_meetups = Event.query.filter(
-        Event.is_recurrence_template == False,
-        Event.event_type == "member_meetup",
-        Event.date >= today,
-    ).order_by(Event.date.asc()).all()
+    ).order_by(Event.date.asc(), Event.time.asc()).all()
 
-    chapters_grouped = {}
-    for ev in upcoming_chapter:
-        chapters_grouped.setdefault(ev.chapter or "Unassigned", []).append(ev)
-
-    return render_template(
-        'events.html',
-        chapters_grouped=chapters_grouped,
-        upcoming_weekly=upcoming_weekly,
-        upcoming_meetups=upcoming_meetups,
-    )
+    return render_template('events.html', upcoming_events=upcoming_events)
 
 
 @phase3.route('/events/<int:event_id>')

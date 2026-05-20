@@ -549,7 +549,7 @@ def _seed_content():
         location="",
         event_type="weekly_recurring",
         chapter="Global",
-        recurrence_rule="every_thursday",
+        recurrence_rule="manual",
     )
     db.session.commit()
 
@@ -562,6 +562,12 @@ def _seed_content():
         date(2026, 6, 4),
         date(2026, 6, 18),
         date(2026, 7, 2),
+        date(2026, 7, 16),
+        date(2026, 7, 30),
+        date(2026, 8, 13),
+        date(2026, 8, 27),
+        date(2026, 9, 10),
+        date(2026, 9, 24),
     }
     stale_pete_children = Event.query.filter(
         Event.recurrence_parent_id == st_pete_template.id,
@@ -597,10 +603,54 @@ def _seed_content():
         )
         db.session.add(child)
 
-    # Materialize the next 8 weeks of Thursday Group Lunch occurrences.
-    # St. Pete template uses recurrence_rule='manual' — _generate_upcoming_occurrences
-    # is a no-op on it; would-be auto-spawned dates would otherwise diverge from
-    # the canonical set above.
+    # Phase 13.1: hand-seed canonical Thursday lunch dates that alternate with
+    # the St. Pete biweekly. May 21 + May 28 skipped for kashi's travel; lunches
+    # resume Jun 11 and alternate from there.
+    canonical_lunch_dates = {
+        date(2026, 6, 11),
+        date(2026, 6, 25),
+        date(2026, 7, 9),
+        date(2026, 7, 23),
+        date(2026, 8, 6),
+        date(2026, 8, 20),
+        date(2026, 9, 3),
+        date(2026, 9, 17),
+    }
+    stale_lunch_children = Event.query.filter(
+        Event.recurrence_parent_id == lunch_template.id,
+        ~Event.date.in_(canonical_lunch_dates),
+    ).all()
+    for s in stale_lunch_children:
+        EventRSVP.query.filter_by(event_id=s.id).delete()
+        db.session.delete(s)
+    if stale_lunch_children:
+        db.session.flush()
+    for d in sorted(canonical_lunch_dates):
+        existing = Event.query.filter_by(
+            recurrence_parent_id=lunch_template.id,
+            date=d,
+        ).first()
+        if existing:
+            continue
+        child = Event(
+            title=lunch_template.title,
+            description=lunch_template.description,
+            date=d,
+            time=lunch_template.time,
+            location=lunch_template.location,
+            host_id=lunch_template.host_id,
+            cover_image=lunch_template.cover_image,
+            event_type="weekly_recurring",
+            chapter=lunch_template.chapter,
+            recurrence_rule="none",
+            recurrence_parent_id=lunch_template.id,
+            is_recurrence_template=False,
+        )
+        db.session.add(child)
+
+    # Both St. Pete + lunch templates use recurrence_rule='manual'; the call
+    # below is a no-op for them. Kept defensively for any future template that
+    # uses a programmatic rule.
     _generate_upcoming_occurrences(lunch_template, weeks_ahead=8)
     db.session.commit()
 
