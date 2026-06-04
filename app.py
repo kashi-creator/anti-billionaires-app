@@ -1430,9 +1430,26 @@ def invite_submit(referral_code):
     invited_by = inviter.name if inviter else None
     invited_by_referral_code = inviter.referral_code if inviter else None
 
-    settings = MeetingSettings.current()
     allowlist = _admin_email_allowlist()
     founder_email = next(iter(allowlist), None) if allowlist else "kashi@thebreathcoachschool.com"
+
+    # Pull next upcoming St. Pete event as source of truth for invite emails.
+    # MeetingSettings is kept only as a fallback when no upcoming event row exists.
+    next_st_pete = Event.query.filter(
+        Event.event_type == "chapter_recurring",
+        Event.is_recurrence_template == False,
+        Event.date >= date.today(),
+    ).order_by(Event.date.asc()).first()
+
+    if next_st_pete:
+        _meeting_date = next_st_pete.date.strftime("%A, %B %-d, %Y")
+        _meeting_time = next_st_pete.time or ""
+        _meeting_location = next_st_pete.location or ""
+    else:
+        _fallback = MeetingSettings.current()
+        _meeting_date = _fallback.meeting_date
+        _meeting_time = _fallback.meeting_time
+        _meeting_location = _fallback.meeting_location
 
     ghl.register_meeting_rsvp(
         email=email,
@@ -1442,9 +1459,9 @@ def invite_submit(referral_code):
         invited_by=invited_by,
         invited_by_referral_code=invited_by_referral_code,
         rsvp_source="invite-link",
-        meeting_date=settings.meeting_date,
-        meeting_time=settings.meeting_time,
-        meeting_location=settings.meeting_location,
+        meeting_date=_meeting_date,
+        meeting_time=_meeting_time,
+        meeting_location=_meeting_location,
         founder_email=founder_email,
     )
 
