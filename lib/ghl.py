@@ -103,17 +103,41 @@ def upsert_contact(
         ]
 
     def _send():
-        try:
-            r = requests.post(
-                f"{GHL_BASE}/contacts/upsert",
-                headers=_headers(),
-                json=payload,
-                timeout=10,
-            )
-            if r.status_code >= 400:
-                log.warning("ghl.upsert_contact %s: %s", r.status_code, r.text[:200])
-        except Exception as e:
-            log.warning("ghl.upsert_contact failed: %s", e)
+        # Retry transient failures (timeouts, network errors, 5xx, 429) with
+        # backoff so a momentary GHL hiccup doesn't permanently drop a contact —
+        # the silent-drop that left paying members out of the CRM. A 4xx other
+        # than 429 is a permanent payload/auth error, so we don't retry those.
+        backoffs = [0, 2, 5, 12]  # 4 attempts spanning ~19s total
+        email_for_log = payload.get("email")
+        last = "unknown error"
+        for attempt, wait in enumerate(backoffs):
+            if wait:
+                time.sleep(wait)
+            try:
+                r = requests.post(
+                    f"{GHL_BASE}/contacts/upsert",
+                    headers=_headers(),
+                    json=payload,
+                    timeout=15,
+                )
+                if r.status_code < 400:
+                    if attempt:
+                        log.info("ghl.upsert_contact recovered on attempt %d for %s",
+                                 attempt + 1, email_for_log)
+                    return
+                if 400 <= r.status_code < 500 and r.status_code != 429:
+                    log.warning("ghl.upsert_contact %s (permanent, no retry) for %s: %s",
+                                r.status_code, email_for_log, r.text[:200])
+                    return
+                last = f"HTTP {r.status_code}: {r.text[:150]}"
+            except Exception as e:
+                last = repr(e)
+            log.warning("ghl.upsert_contact attempt %d/%d failed for %s: %s",
+                        attempt + 1, len(backoffs), email_for_log, last)
+        # Exhausted all attempts. The nightly `flask cron reconcile` re-pushes
+        # every active member, so this is recoverable within a day even now.
+        log.error("ghl.upsert_contact GAVE UP after %d attempts for %s: %s",
+                  len(backoffs), email_for_log, last)
 
     threading.Thread(target=_send, daemon=True).start()
 
