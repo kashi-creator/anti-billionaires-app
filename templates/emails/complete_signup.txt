@@ -1,0 +1,9 @@
+Hi {{ name }},
+
+Your payment went through and your Sovereign Society membership is active --
+but you haven't finished creating your login yet.
+
+Set your password to get inside:
+{{ complete_url }}
+
+Sovereign Society

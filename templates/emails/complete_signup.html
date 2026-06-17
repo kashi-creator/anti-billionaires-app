@@ -1,0 +1,10 @@
+{% extends "emails/_layout.html" %}
+{% block content %}
+<h1 style="font-family:Georgia,serif;font-size:24px;color:#D4AF37;margin:0 0 16px 0;">Finish setting up your account</h1>
+<p>Hi {{ name }}, your payment went through and your Sovereign Society membership is active &mdash; but you haven't finished creating your login yet.</p>
+<p>Set your password to get inside:</p>
+<p style="margin:32px 0;text-align:center;">
+  <a href="{{ complete_url }}" style="display:inline-block;background:#D4AF37;color:#0A0A0A;padding:14px 32px;text-decoration:none;font-weight:bold;letter-spacing:1px;text-transform:uppercase;font-size:13px;border-radius:4px;">Finish Signup</a>
+</p>
+<p style="font-size:13px;color:#888;">If the button doesn't work, paste this into your browser:<br>{{ complete_url }}</p>
+{% endblock %}

@@ -148,6 +148,20 @@ def send_lifetime_unlocked(user):
     )
 
 
+def send_complete_signup_reminder(email, name, complete_url, async_=True):
+    """Remind someone who paid through Stripe Checkout but never finished
+    creating their app account (no User row / password yet). Takes a raw
+    email + name rather than a user object, because by definition no User
+    exists for them yet."""
+    return send_email(
+        to=email,
+        subject="Finish setting up your Sovereign Society account",
+        template="complete_signup",
+        context={"name": name or "there", "complete_url": complete_url},
+        async_=async_,
+    )
+
+
 def send_weekly_digest(user, digest_data):
     return send_email(
         to=user.email,

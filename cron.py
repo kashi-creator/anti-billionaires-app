@@ -286,8 +286,112 @@ def _resync_ghl_active_members(dry_run: bool = False) -> dict:
     return {"actives": len(actives), "pushed": pushed}
 
 
+# ===== Paid-but-no-account reminders =====
+#
+# Stripe Checkout creates a Customer + Subscription BEFORE the app account
+# exists — the User row (with password) is only created when the buyer
+# completes the /subscription/success form. A buyer who closes the tab right
+# after paying ends up with a live Stripe subscription and NO login.
+#
+# This job finds those people and emails them a link back to finish signup.
+#   - Only subs in a paid-ish state (trialing/active/past_due/unpaid).
+#   - Skip subs younger than MIN_AGE_HOURS (give them time to finish on their
+#     own) or older than MAX_AGE_DAYS (stale — stop chasing).
+#   - Dedup via Stripe customer metadata (signup_reminder_count /
+#     signup_reminder_last_at): at most MAX reminders, spaced >= SPACING_HOURS.
+# Idempotent and safe to run daily.
+
+SIGNUP_REMINDER_MIN_AGE_HOURS = 2
+SIGNUP_REMINDER_MAX_AGE_DAYS = 14
+SIGNUP_REMINDER_MAX = 3
+SIGNUP_REMINDER_SPACING_HOURS = 48
+_SIGNUP_LIVE_STATUSES = {"trialing", "active", "past_due", "unpaid"}
+
+
+def _remind_paid_no_account(dry_run: bool = False) -> dict:
+    """Email Stripe subscribers who never created an app account."""
+    import stripe as _stripe
+    from flask import url_for
+    from email_send import send_complete_signup_reminder
+
+    _stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not _stripe.api_key or "placeholder" in _stripe.api_key.lower():
+        click.echo("  [skip] STRIPE_SECRET_KEY not configured.")
+        return {"checked": 0, "candidates": 0, "reminded": 0, "skipped": 0}
+
+    now = datetime.utcnow()
+    min_age = timedelta(hours=SIGNUP_REMINDER_MIN_AGE_HOURS)
+    max_age = timedelta(days=SIGNUP_REMINDER_MAX_AGE_DAYS)
+    spacing = timedelta(hours=SIGNUP_REMINDER_SPACING_HOURS)
+
+    checked = candidates = reminded = skipped = 0
+    subs = _stripe.Subscription.list(status="all", limit=100, expand=["data.customer"])
+    for sub in subs.auto_paging_iter():
+        checked += 1
+        if sub.get("status") not in _SIGNUP_LIVE_STATUSES:
+            continue
+        cust = sub.get("customer")
+        if not isinstance(cust, dict) or cust.get("deleted"):
+            continue
+        email = (cust.get("email") or (cust.get("metadata") or {}).get("signup_email") or "").strip().lower()
+        if not email:
+            continue
+        # Has an app account already? Then nothing to do.
+        if User.query.filter_by(email=email).first():
+            continue
+        # Age window.
+        age = now - datetime.utcfromtimestamp(sub.get("created", 0))
+        if age < min_age or age > max_age:
+            skipped += 1
+            continue
+        # Reminder throttle (stored on the Stripe customer).
+        meta = cust.get("metadata") or {}
+        count = int(meta.get("signup_reminder_count") or 0)
+        if count >= SIGNUP_REMINDER_MAX:
+            skipped += 1
+            continue
+        last_raw = meta.get("signup_reminder_last_at")
+        if last_raw:
+            try:
+                if now - datetime.fromisoformat(last_raw) < spacing:
+                    skipped += 1
+                    continue
+            except (ValueError, TypeError):
+                pass
+        # Build the finish-signup link from their most recent checkout session.
+        sess_id = None
+        try:
+            sessions = _stripe.checkout.Session.list(customer=cust["id"], limit=1)
+            if sessions.data:
+                sess_id = sessions.data[0].id
+        except Exception as e:
+            click.echo(f"  [warn] no checkout session for {email}: {e}")
+        if not sess_id:
+            skipped += 1
+            continue
+        complete_url = url_for("subscription_success", session_id=sess_id, _external=True)
+        name = cust.get("name") or email.split("@")[0]
+        candidates += 1
+        if dry_run:
+            click.echo(f"  [DRY] would remind {email} (age {age.days}d, sent {count} so far) -> {complete_url}")
+            reminded += 1
+            continue
+        if send_complete_signup_reminder(email, name, complete_url, async_=False):
+            reminded += 1
+            try:
+                _stripe.Customer.modify(cust["id"], metadata={
+                    "signup_reminder_count": str(count + 1),
+                    "signup_reminder_last_at": now.isoformat(),
+                })
+            except Exception as e:
+                click.echo(f"  [warn] reminder metadata update failed for {email}: {e}")
+        else:
+            click.echo(f"  [err] reminder email failed for {email}")
+    return {"checked": checked, "candidates": candidates, "reminded": reminded, "skipped": skipped}
+
+
 def run_nightly_reconcile(dry_run: bool = False) -> dict:
-    """Orchestrator — runs all three reconciliation jobs and returns combined stats."""
+    """Orchestrator — runs all reconciliation jobs and returns combined stats."""
     click.echo(f"[RECONCILE] dry_run={dry_run}")
     click.echo("  referrer reconciliation...")
     ref_stats = _reconcile_referrers(dry_run=dry_run)
@@ -298,7 +402,10 @@ def run_nightly_reconcile(dry_run: bool = False) -> dict:
     click.echo("  ghl resync...")
     ghl_stats = _resync_ghl_active_members(dry_run=dry_run)
     click.echo(f"  -> {ghl_stats}")
-    return {"referrer": ref_stats, "subscription": sub_stats, "ghl": ghl_stats}
+    click.echo("  paid-but-no-account reminders...")
+    rem_stats = _remind_paid_no_account(dry_run=dry_run)
+    click.echo(f"  -> {rem_stats}")
+    return {"referrer": ref_stats, "subscription": sub_stats, "ghl": ghl_stats, "signup_reminders": rem_stats}
 
 
 @cron_cli.command("reconcile")
@@ -307,9 +414,23 @@ def cli_reconcile(dry_run):
     """flask cron reconcile [--dry-run] -- nightly reconciliation sweep.
 
     Patches missing referred_by from GHL, syncs subscription_status from
-    Stripe, and re-pushes custom fields to GHL contact records. Idempotent.
+    Stripe, re-pushes custom fields to GHL, and reminds paid-but-no-account
+    buyers to finish signup. Idempotent.
     """
     run_nightly_reconcile(dry_run=dry_run)
+
+
+@cron_cli.command("signup-reminders")
+@click.option("--dry-run", is_flag=True, help="List who would be reminded without sending.")
+def cli_signup_reminders(dry_run):
+    """flask cron signup-reminders [--dry-run] -- email buyers who paid via
+    Stripe but never finished creating their app account.
+
+    Runs automatically as part of `flask cron reconcile`; this standalone
+    command is for manual runs and dry-run testing.
+    """
+    stats = _remind_paid_no_account(dry_run=dry_run)
+    click.echo(f"[SIGNUP-REMINDERS] {stats}")
 
 
 # ===== Team auto-post queue (Phase 14) =====
