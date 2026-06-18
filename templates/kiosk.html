@@ -56,12 +56,19 @@
     font-family: 'Fraunces', Georgia, serif;
     font-weight: 400;
     font-size: clamp(2.2rem, 6vw, 4.6rem);
-    line-height: 1.08;
+    line-height: 1.12;
     letter-spacing: -0.015em;
-    max-width: 16ch;
-    margin: 0 auto clamp(1.6rem, 4vh, 2.8rem);
+    max-width: 26ch;
+    margin: 0 auto clamp(0.9rem, 2.4vh, 1.6rem);
   }
-  h1 .accent { color: var(--gold); font-style: italic; }
+  .directive {
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    font-size: clamp(1.05rem, 2vw, 1.6rem);
+    color: var(--muted);
+    margin: 0 auto clamp(1.6rem, 4vh, 2.6rem);
+    max-width: 30ch;
+  }
   .qr-card {
     background: #fff;
     padding: clamp(0.9rem, 1.8vw, 1.4rem);
@@ -77,32 +84,16 @@
     0%, 100% { box-shadow: 0 0 0 1px rgba(212,175,55,0.30), 0 24px 70px rgba(0,0,0,0.6); }
     50%      { box-shadow: 0 0 0 1px rgba(212,175,55,0.70), 0 0 46px rgba(212,175,55,0.32), 0 24px 70px rgba(0,0,0,0.6); }
   }
-  .scan {
-    margin-top: clamp(1.4rem, 3.5vh, 2.4rem);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(1rem, 2vw, 1.5rem);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--gold);
-  }
-  .sub {
-    margin-top: 0.6rem;
-    color: var(--muted);
-    font-size: clamp(0.85rem, 1.4vw, 1.1rem);
-  }
-  .sub b { color: var(--ink); font-weight: 500; }
 </style>
 </head>
 <body>
   <div class="brand">Sovereign Society</div>
-  <h1>You're here again!<br>You must <span class="accent">love</span> coming.<br>Time to become a member.</h1>
+  <h1>By now, you know who we&nbsp;are.<br>We know who you&nbsp;are.</h1>
+  <p class="directive">If you're ready to continue, scan&nbsp;below.</p>
 
   <div class="qr-card">
-    <img src="{{ url_for('static', filename='img/join-qr.png') }}" alt="Scan to join">
+    <img src="{{ url_for('static', filename='img/join-qr.png') }}" alt="Scan to continue">
   </div>
-
-  <div class="scan">Scan to join</div>
-  <p class="sub">Point your phone camera at the code &mdash; <b>$99/month</b>, cancel anytime.</p>
 
 <script>
   // Keep the iPad screen awake while the kiosk is on display (Wake Lock API).
