@@ -2164,6 +2164,53 @@ def create_checkout_session():
         return jsonify({"error": str(e)}), 400
 
 
+# ===== DOOR / KIOSK ONE-TAP JOIN =====
+# Walk-in funnel for in-person meetings: an iPad at the door runs /kiosk (a
+# full-screen display with a QR that points at /join). The /join landing page
+# has a single CTA that drops the visitor straight onto the SAME monthly Stripe
+# Checkout used everywhere else — Stripe's hosted page collects their email and
+# card (no on-page email field, lowest friction at the door).
+
+@app.route("/kiosk")
+def kiosk():
+    """Full-screen display shown on the iPad at the door (headline + QR)."""
+    return render_template("kiosk.html")
+
+
+@app.route("/join")
+def join():
+    """Public landing page the door QR points to. One-tap CTA -> Stripe."""
+    return render_template("join.html")
+
+
+@app.route("/join/checkout")
+def join_checkout():
+    """One-tap checkout. Creates the same monthly subscription Checkout Session
+    as /create-checkout-session but WITHOUT a pre-collected email (Stripe's page
+    collects email + card), then 303-redirects straight to Stripe. The existing
+    /subscription/success handler already falls back to customer_details.email,
+    so the post-payment signup works unchanged."""
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not stripe_key or "REPLACE" in stripe_key or "placeholder" in stripe_key.lower():
+        flash("Payment is not configured yet. Please see an organizer to join.", "error")
+        return redirect(url_for("join"))
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            mode="subscription",
+            allow_promotion_codes=True,
+            success_url=request.host_url.rstrip("/") + url_for("subscription_success") + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=request.host_url.rstrip("/") + url_for("join"),
+            metadata={"source": "door_kiosk"},
+        )
+        return redirect(session.url, code=303)
+    except Exception as e:
+        app.logger.error("join_checkout failed: %s", e)
+        flash("Could not start checkout. Please try again.", "error")
+        return redirect(url_for("join"))
+
+
 @app.route("/subscription/success", methods=["GET", "POST"])
 @require_csrf
 def subscription_success():

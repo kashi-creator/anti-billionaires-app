@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Welcome — Sovereign Society</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --ink: #F2F2F2;
+    --muted: #9A9A9A;
+    --gold: #D4AF37;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(212,175,55,0.10), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    height: 100%;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: clamp(2rem, 5vh, 4rem) clamp(1.5rem, 5vw, 4rem);
+    -webkit-font-smoothing: antialiased;
+  }
+  .brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(0.8rem, 1.4vw, 1.05rem);
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: clamp(1.5rem, 4vh, 3rem);
+  }
+  h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(2.2rem, 6vw, 4.6rem);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    max-width: 16ch;
+    margin: 0 auto clamp(1.6rem, 4vh, 2.8rem);
+  }
+  h1 .accent { color: var(--gold); font-style: italic; }
+  .qr-card {
+    background: #fff;
+    padding: clamp(0.9rem, 1.8vw, 1.4rem);
+    border-radius: 22px;
+    box-shadow: 0 0 0 1px rgba(212,175,55,0.35), 0 24px 70px rgba(0,0,0,0.6);
+    width: clamp(220px, 34vh, 380px);
+    height: clamp(220px, 34vh, 380px);
+    display: flex;
+    animation: glow 3.2s ease-in-out infinite;
+  }
+  .qr-card img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  @keyframes glow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(212,175,55,0.30), 0 24px 70px rgba(0,0,0,0.6); }
+    50%      { box-shadow: 0 0 0 1px rgba(212,175,55,0.70), 0 0 46px rgba(212,175,55,0.32), 0 24px 70px rgba(0,0,0,0.6); }
+  }
+  .scan {
+    margin-top: clamp(1.4rem, 3.5vh, 2.4rem);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .sub {
+    margin-top: 0.6rem;
+    color: var(--muted);
+    font-size: clamp(0.85rem, 1.4vw, 1.1rem);
+  }
+  .sub b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="brand">Sovereign Society</div>
+  <h1>You're here again!<br>You must <span class="accent">love</span> coming.<br>Time to become a member.</h1>
+
+  <div class="qr-card">
+    <img src="{{ url_for('static', filename='img/join-qr.png') }}" alt="Scan to join">
+  </div>
+
+  <div class="scan">Scan to join</div>
+  <p class="sub">Point your phone camera at the code &mdash; <b>$99/month</b>, cancel anytime.</p>
+
+<script>
+  // Keep the iPad screen awake while the kiosk is on display (Wake Lock API).
+  // Progressive enhancement — silently ignored where unsupported.
+  let _wakeLock = null;
+  async function keepAwake() {
+    try {
+      if ('wakeLock' in navigator) {
+        _wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) { /* user gesture may be required; re-try on tap/visibility */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') keepAwake();
+  });
+  document.addEventListener('click', keepAwake, { once: false });
+  keepAwake();
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>Become a Member — Sovereign Society</title>
+<meta name="description" content="Monthly access to the private members portal, networking, and every organized lunch and men's group meeting.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0A0A;
+    --ink: #E8E8E8;
+    --muted: #8A8A8A;
+    --gold: #D4AF37;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.2rem 1.25rem calc(2.2rem + env(safe-area-inset-bottom));
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: 100%; max-width: 460px; }
+  .brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 1.6rem;
+  }
+  h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    font-size: clamp(1.9rem, 8.5vw, 2.6rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-align: center;
+    margin-bottom: 0.9rem;
+  }
+  .lede {
+    color: var(--muted);
+    font-size: 1.02rem;
+    text-align: center;
+    margin: 0 auto 1.7rem;
+    max-width: 40ch;
+  }
+  .price {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .price .amt {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 2.6rem;
+    color: var(--gold);
+    font-weight: 500;
+  }
+  .price .per { color: var(--muted); font-size: 1rem; }
+  ul.feats {
+    list-style: none;
+    margin: 0 0 2rem;
+    display: grid;
+    gap: 0.7rem;
+  }
+  ul.feats li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    font-size: 0.98rem;
+  }
+  ul.feats svg { flex: 0 0 auto; margin-top: 3px; }
+  .cta {
+    display: block;
+    width: 100%;
+    text-align: center;
+    text-decoration: none;
+    background: linear-gradient(135deg, #E5C254, #C49B2A);
+    color: #0A0A0A;
+    font-weight: 600;
+    font-size: 1.12rem;
+    letter-spacing: 0.01em;
+    padding: 1.05rem 1.25rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.22);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .cta:active { transform: translateY(1px); box-shadow: 0 6px 18px rgba(212, 175, 55, 0.2); }
+  .fine {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 0.9rem;
+  }
+  .signin { text-align: center; margin-top: 1.6rem; font-size: 0.9rem; color: var(--muted); }
+  .signin a { color: var(--gold); text-decoration: none; }
+  .flash {
+    background: rgba(231, 76, 60, 0.12);
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    color: #f5b7b1;
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Sovereign Society</div>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <h1>Time to become a&nbsp;member.</h1>
+    <p class="lede">
+      Monthly access to the exclusive internal members portal and social
+      networking platform — plus every organized lunch and men's group meeting.
+    </p>
+
+    <div class="price">
+      <span class="amt">$99</span><span class="per">/month</span>
+    </div>
+
+    <ul class="feats">
+      {% set _check %}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>{% endset %}
+      <li>{{ _check|safe }} The private members portal &amp; community feed</li>
+      <li>{{ _check|safe }} The internal social networking platform</li>
+      <li>{{ _check|safe }} Every organized lunch &amp; men's group meeting</li>
+      <li>{{ _check|safe }} Live events, workshops &amp; group trainings</li>
+      <li>{{ _check|safe }} Direct access to the brotherhood</li>
+    </ul>
+
+    <a class="cta" href="{{ url_for('join_checkout') }}">Become a member — $99/mo</a>
+    <p class="fine">Cancel anytime. Secure checkout powered by Stripe.</p>
+
+    <div class="signin">Already a member? <a href="{{ url_for('login') }}">Sign in</a></div>
+  </div>
+</body>
+</html>
