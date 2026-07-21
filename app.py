@@ -2211,6 +2211,37 @@ def join_checkout():
         return redirect(url_for("join"))
 
 
+# ===== DOOR CHECK-IN (attendance capture) =====
+# The kiosk QR points here. Every walk-in is captured into GHL (attendance +
+# meetings_attended count) BEFORE the join CTA, so guests who use a free meeting
+# and don't pay that night are no longer invisible to the nurture / hard-close.
+
+@app.route("/checkin", methods=["GET"])
+def checkin():
+    """Door check-in landing (the kiosk QR points here)."""
+    return render_template("checkin.html")
+
+
+@app.route("/checkin", methods=["POST"])
+@limiter.limit("60 per minute")
+@require_csrf
+def checkin_submit():
+    """Capture a walk-in -> GHL (attendance + meetings_attended). Returns JSON."""
+    name = (request.form.get("name") or "").strip()
+    phone = (request.form.get("phone") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    if not name or len(name) > 120:
+        return jsonify({"error": "Enter your name."}), 400
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 7 or len(phone) > 40:
+        return jsonify({"error": "Enter a valid mobile number."}), 400
+    if email and ("@" not in email or "." not in email or len(email) > 200):
+        return jsonify({"error": "That email doesn't look right."}), 400
+    ghl.register_door_checkin(name=name, phone=phone, email=email or None)
+    first = name.split()[0] if name.split() else name
+    return jsonify({"success": True, "first_name": first})
+
+
 @app.route("/subscription/success", methods=["GET", "POST"])
 @require_csrf
 def subscription_success():

@@ -499,6 +499,157 @@ def _render_founder_html(*, name, email, phone, sms_opt_in, host, meeting_date, 
 """
 
 
+# ===== Door / kiosk walk-in check-in =====
+# The iPad at the door runs /kiosk -> QR -> /checkin. Each scan captures the
+# guest into GHL, tags attendance, increments the `meetings_attended` custom
+# field, and (for a NON-member's 2nd+ visit) applies `used-2-meetings` which
+# fires the post-meeting hard-close workflow. Tags are ADDED, never replaced,
+# so checking in an existing member never wipes their stage tag.
+
+_MEETINGS_ATTENDED_KEY = "contact.meetings_attended"
+_field_id_cache: dict = {}
+
+
+def _custom_field_id(field_key: str) -> Optional[str]:
+    """Resolve a custom field's id by its fieldKey (cached)."""
+    if field_key in _field_id_cache:
+        return _field_id_cache[field_key]
+    if not _enabled():
+        return None
+    try:
+        r = requests.get(
+            f"{GHL_BASE}/locations/{os.environ['GHL_LOCATION_ID']}/customFields",
+            headers=_headers(), timeout=10,
+        )
+        for f in (r.json().get("customFields") or []):
+            if f.get("fieldKey") == field_key:
+                _field_id_cache[field_key] = f.get("id")
+                return f.get("id")
+    except Exception as e:
+        log.warning("ghl._custom_field_id failed: %s", e)
+    return None
+
+
+def _get_contact(contact_id: str) -> Optional[dict]:
+    if not (_enabled() and contact_id):
+        return None
+    try:
+        r = requests.get(f"{GHL_BASE}/contacts/{contact_id}", headers=_headers(), timeout=10)
+        if r.status_code >= 400:
+            return None
+        return r.json().get("contact") or {}
+    except Exception as e:
+        log.warning("ghl._get_contact failed: %s", e)
+        return None
+
+
+def _find_contact_id_by_phone(phone: str) -> Optional[str]:
+    """Match a contact by the last 10 digits of the phone."""
+    if not (_enabled() and phone):
+        return None
+    target = "".join(ch for ch in phone if ch.isdigit())[-10:]
+    if not target:
+        return None
+    try:
+        r = requests.get(
+            f"{GHL_BASE}/contacts/", headers=_headers(),
+            params={"locationId": os.environ["GHL_LOCATION_ID"], "query": phone, "limit": 20},
+            timeout=10,
+        )
+        for c in (r.json().get("contacts") or []):
+            cp = "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())[-10:]
+            if cp and cp == target:
+                return c.get("id")
+    except Exception as e:
+        log.warning("ghl._find_contact_id_by_phone failed: %s", e)
+    return None
+
+
+def _add_tags(contact_id: str, tags: Iterable[str]) -> None:
+    """Append tags to a contact WITHOUT replacing existing ones."""
+    tags = [t for t in tags if t]
+    if not (_enabled() and contact_id and tags):
+        return
+    try:
+        requests.post(
+            f"{GHL_BASE}/contacts/{contact_id}/tags", headers=_headers(),
+            json={"tags": list(tags)}, timeout=10,
+        )
+    except Exception as e:
+        log.warning("ghl._add_tags failed: %s", e)
+
+
+def register_door_checkin(*, name: str, phone: str, email: Optional[str] = None) -> None:
+    """Capture a walk-in from the door kiosk. Fire-and-forget daemon thread.
+
+    - Resolves (or creates) the GHL contact by email/phone WITHOUT passing tags,
+      so an existing member's stage tag is never clobbered.
+    - Increments the `meetings_attended` numeric custom field.
+    - Adds `meeting-checkin` + `sms-opted-in` (+ `prospect` only for non-members).
+    - On a non-member's 2nd+ visit, adds `used-2-meetings` to fire the hard-close.
+    Fail-silent: any step that errors is logged but never blocks the door route.
+    """
+    def _run():
+        if not _enabled():
+            log.debug("register_door_checkin skipped: GHL env unset")
+            return
+        loc = os.environ["GHL_LOCATION_ID"]
+
+        # 1. Resolve or create the contact (no tags passed -> never clobbers).
+        contact_id = None
+        if email:
+            contact_id = find_contact_id_by_email(email)
+        if not contact_id:
+            contact_id = _find_contact_id_by_phone(phone)
+        if not contact_id:
+            payload = {"locationId": loc, "name": name, "phone": phone}
+            if email:
+                payload["email"] = email.lower().strip()
+            try:
+                r = requests.post(f"{GHL_BASE}/contacts/upsert", headers=_headers(), json=payload, timeout=10)
+                if r.status_code < 400:
+                    contact_id = (r.json().get("contact") or {}).get("id")
+            except Exception as e:
+                log.warning("register_door_checkin create failed: %s", e)
+        if not contact_id:
+            log.warning("register_door_checkin: could not resolve contact for %r", name)
+            return
+
+        contact = _get_contact(contact_id) or {}
+        existing_tags = {(t or "").lower() for t in (contact.get("tags") or [])}
+        is_member = bool(existing_tags & {"active-member", "lifetime-qualified"})
+
+        # 2. Read + increment meetings_attended.
+        fid = _custom_field_id(_MEETINGS_ATTENDED_KEY)
+        current = 0
+        for cf in (contact.get("customFields") or []):
+            if cf.get("id") == fid:
+                try:
+                    current = int(float(cf.get("value") or 0))
+                except (TypeError, ValueError):
+                    current = 0
+        new_count = current + 1
+        if fid:
+            try:
+                requests.put(
+                    f"{GHL_BASE}/contacts/{contact_id}", headers=_headers(),
+                    json={"customFields": [{"id": fid, "value": str(new_count)}]}, timeout=10,
+                )
+            except Exception as e:
+                log.warning("register_door_checkin field update failed: %s", e)
+
+        # 3. Tags (append-only). Prospect stage only for non-members.
+        add = ["meeting-checkin", "sms-opted-in"]
+        if not is_member:
+            add.append("prospect")
+        if not is_member and new_count >= 2:
+            add.append("used-2-meetings")  # fires the hard-close workflow
+        _add_tags(contact_id, add)
+        log.info("door check-in: %r visit #%d member=%s tags+=%s", name, new_count, is_member, add)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def custom_fields_from_user(user) -> dict:
     """Build the standard 4-field dict from a User row."""
     return {

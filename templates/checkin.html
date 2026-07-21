@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>Check In — Sovereign Society</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0A0A0A; --ink:#E8E8E8; --muted:#8A8A8A; --gold:#D4AF37; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:var(--bg); color:var(--ink); }
+  body {
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    min-height:100vh; min-height:100dvh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:2.2rem 1.25rem calc(2.2rem + env(safe-area-inset-bottom));
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { width:100%; max-width:440px; }
+  .brand {
+    font-family:'JetBrains Mono',monospace; font-size:0.72rem; letter-spacing:0.32em;
+    text-transform:uppercase; color:var(--gold); text-align:center; margin-bottom:1.5rem;
+  }
+  h1 {
+    font-family:'Fraunces',Georgia,serif; font-weight:400;
+    font-size:clamp(1.9rem,8vw,2.5rem); line-height:1.14; text-align:center; margin-bottom:0.7rem;
+  }
+  .lede { color:var(--muted); font-size:1rem; text-align:center; margin:0 auto 1.8rem; max-width:34ch; }
+  label { display:block; font-size:0.8rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin:0 0 0.4rem 0.15rem; }
+  input {
+    width:100%; background:#141414; border:1px solid #2a2a2a; color:var(--ink);
+    font-size:1.1rem; font-family:inherit; padding:0.95rem 1rem; border-radius:11px;
+    margin-bottom:1.1rem; outline:none; transition:border-color .15s ease;
+  }
+  input:focus { border-color:var(--gold); }
+  .btn {
+    display:block; width:100%; text-align:center; text-decoration:none; border:none; cursor:pointer;
+    background:linear-gradient(135deg,#E5C254,#C49B2A); color:#0A0A0A;
+    font-family:inherit; font-weight:600; font-size:1.12rem; letter-spacing:0.01em;
+    padding:1.05rem 1.25rem; border-radius:12px; box-shadow:0 10px 30px rgba(212,175,55,0.22);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:active { transform:translateY(1px); }
+  .btn[disabled] { opacity:0.6; cursor:default; }
+  .fine { text-align:center; color:var(--muted); font-size:0.8rem; margin-top:0.9rem; }
+  .err { color:#f5b7b1; text-align:center; font-size:0.9rem; margin-bottom:1rem; min-height:1.1rem; }
+  #done { display:none; text-align:center; }
+  #done h1 { margin-bottom:0.9rem; }
+  #done .sub { color:var(--muted); font-size:1.02rem; margin:0 auto 2rem; max-width:32ch; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Sovereign Society</div>
+
+    <!-- Capture -->
+    <form id="checkin" novalidate>
+      <h1>Take your seat.</h1>
+      <p class="lede">You're at the table. Check in and we'll keep the door open for you.</p>
+      <div class="err" id="err"></div>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="name">First name</label>
+      <input id="name" name="name" type="text" autocomplete="given-name" autocapitalize="words" required>
+      <label for="phone">Mobile</label>
+      <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(555) 555-5555" required>
+      <label for="email">Email <span style="text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input id="email" name="email" type="email" inputmode="email" autocomplete="email">
+      <button class="btn" type="submit" id="submit">I'm here</button>
+      <p class="fine">One tap. We'll text you when the table's set.</p>
+    </form>
+
+    <!-- Confirmation -->
+    <div id="done">
+      <h1 id="welcome">You're in.</h1>
+      <p class="sub">Welcome to the table. Give more than you take.</p>
+      <a class="btn" href="{{ url_for('join') }}">Become a member — $99/mo</a>
+      <p class="fine">Or just enjoy tonight. Join when you're ready.</p>
+    </div>
+  </div>
+
+<script>
+  const form = document.getElementById('checkin');
+  const err = document.getElementById('err');
+  const btn = document.getElementById('submit');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    btn.disabled = true; btn.textContent = 'Checking you in...';
+    try {
+      const res = await fetch('{{ url_for("checkin_submit") }}', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new FormData(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        if (data.first_name) {
+          document.getElementById('welcome').textContent = "You're in, " + data.first_name + ".";
+        }
+        form.style.display = 'none';
+        document.getElementById('done').style.display = 'block';
+        return;
+      }
+      err.textContent = data.error || 'Something went wrong. Try again.';
+    } catch (_) {
+      err.textContent = 'Network hiccup. Try again.';
+    }
+    btn.disabled = false; btn.textContent = "I'm here";
+  });
+</script>
+</body>
+</html>
