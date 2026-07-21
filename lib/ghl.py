@@ -680,6 +680,58 @@ def register_door_checkin(*, name: str, phone: str, email: Optional[str] = None)
     threading.Thread(target=_run, daemon=True).start()
 
 
+def register_scorecard_lead(*, name: str, email: Optional[str] = None,
+                            phone: Optional[str] = None, weakest: str = "") -> None:
+    """Capture a public Sovereign Code scorecard lead into GHL (lead magnet).
+    Fire-and-forget daemon thread. Tags `prospect` + `scorecard-lead`
+    (+ `sms-opted-in` when a phone is given) WITHOUT clobbering an existing
+    member's tags, and drops a note with their two weakest pillars.
+    """
+    def _run():
+        if not _enabled():
+            return
+        loc = os.environ["GHL_LOCATION_ID"]
+        cid = None
+        if email:
+            cid = find_contact_id_by_email(email)
+        if not cid and phone:
+            cid = _find_contact_id_by_phone(phone)
+        if not cid:
+            payload = {"locationId": loc, "name": name}
+            if email:
+                payload["email"] = email.lower().strip()
+            if phone:
+                payload["phone"] = phone
+            try:
+                r = requests.post(f"{GHL_BASE}/contacts/upsert", headers=_headers(), json=payload, timeout=10)
+                if r.status_code < 400:
+                    cid = (r.json().get("contact") or {}).get("id")
+            except Exception as e:
+                log.warning("register_scorecard_lead create failed: %s", e)
+        if not cid:
+            log.warning("register_scorecard_lead: could not resolve contact for %r", name)
+            return
+
+        contact = _get_contact(cid) or {}
+        is_member = bool({(t or '').lower() for t in (contact.get('tags') or [])}
+                         & {'active-member', 'lifetime-qualified'})
+        add = ["scorecard-lead"]
+        if phone:
+            add.append("sms-opted-in")
+        if not is_member:
+            add.append("prospect")
+        _add_tags(cid, add)
+        if weakest:
+            try:
+                requests.post(f"{GHL_BASE}/contacts/{cid}/notes", headers=_headers(),
+                              json={"body": f"Sovereign Code scorecard — weakest: {weakest}"}, timeout=10)
+            except Exception:
+                pass
+        log.info("scorecard lead: %r member=%s tags+=%s", name, is_member, add)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def custom_fields_from_user(user) -> dict:
     """Build the standard 4-field dict from a User row."""
     return {

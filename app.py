@@ -2242,6 +2242,55 @@ def checkin_submit():
     return jsonify({"success": True, "first_name": first})
 
 
+# ===== PUBLIC SCORECARD (Sovereign Code lead magnet) =====
+# Score 0-10 on the 8 pillars -> capture name/email/(phone) -> GHL prospect +
+# prospect drip. A lightweight public self-score (NOT the 40-question member
+# assessment); reuses only the pillar names/slugs from lib/assessment.
+
+@app.route("/scorecard", methods=["GET"])
+def scorecard():
+    """Public Sovereign Code scorecard (lead magnet)."""
+    return render_template("scorecard.html", pillars=assessment_lib.PILLARS)
+
+
+@app.route("/scorecard/submit", methods=["POST"])
+@limiter.limit("20 per hour")
+@require_csrf
+def scorecard_submit():
+    """Validate scores + capture the lead into GHL. Returns results JSON."""
+    name = (request.form.get("name") or "").strip()
+    email = (request.form.get("email") or "").strip().lower()
+    phone = (request.form.get("phone") or "").strip()
+    if not name or len(name) > 120:
+        return jsonify({"error": "Enter your name."}), 400
+    if "@" not in email or "." not in email or len(email) > 200:
+        return jsonify({"error": "Enter a valid email."}), 400
+    if phone:
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        if len(digits) < 7 or len(phone) > 40:
+            return jsonify({"error": "That phone doesn't look right."}), 400
+    scores = {}
+    for p in assessment_lib.PILLARS:
+        raw = request.form.get(f"score_{p['slug']}")
+        try:
+            v = int(raw)
+        except (TypeError, ValueError):
+            v = None
+        if v is None or not (0 <= v <= 10):
+            return jsonify({"error": f"Score {p['name']} 0 to 10."}), 400
+        scores[p["slug"]] = v
+    order = sorted(assessment_lib.PILLARS, key=lambda p: scores[p["slug"]])
+    lowest = order[:2]
+    weakest = ", ".join(f"{p['name']} ({scores[p['slug']]})" for p in lowest)
+    ghl.register_scorecard_lead(name=name, email=email, phone=phone or None, weakest=weakest)
+    return jsonify({
+        "success": True,
+        "first_name": name.split()[0] if name.split() else name,
+        "scores": scores,
+        "lowest": [{"slug": p["slug"], "name": p["name"], "score": scores[p["slug"]]} for p in lowest],
+    })
+
+
 @app.route("/subscription/success", methods=["GET", "POST"])
 @require_csrf
 def subscription_success():

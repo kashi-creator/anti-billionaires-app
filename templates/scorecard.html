@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>The Sovereign Code — Score Yourself</title>
+<meta name="description" content="Eight pillars of a sovereign man. Score yourself 0 to 10, honest. Find the two where they've got you.">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/sovereign-logo.png') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0A0A0A; --ink:#E8E8E8; --muted:#8A8A8A; --gold:#D4AF37; --line:#242424; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:var(--bg); color:var(--ink); }
+  body { font-family:'Inter',-apple-system,sans-serif; line-height:1.55; -webkit-font-smoothing:antialiased;
+    padding:2.4rem 1.25rem calc(2.4rem + env(safe-area-inset-bottom)); }
+  .wrap { width:100%; max-width:520px; margin:0 auto; }
+  .brand { font-family:'JetBrains Mono',monospace; font-size:0.72rem; letter-spacing:0.32em; text-transform:uppercase; color:var(--gold); text-align:center; margin-bottom:1.4rem; }
+  h1 { font-family:'Fraunces',Georgia,serif; font-weight:400; font-size:clamp(2rem,8vw,2.7rem); line-height:1.1; text-align:center; margin-bottom:0.8rem; }
+  .lede { color:var(--muted); font-size:1.02rem; text-align:center; margin:0 auto 2.2rem; max-width:40ch; }
+  .pillar { padding:1.05rem 0; border-bottom:1px solid var(--line); }
+  .pillar .row { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.55rem; }
+  .pillar .name { font-family:'Fraunces',serif; font-size:1.2rem; }
+  .pillar .val { font-family:'JetBrains Mono',monospace; font-size:1.15rem; color:var(--gold); font-weight:500; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:5px;
+    background:linear-gradient(90deg,var(--gold) var(--pct,50%), #2a2a2a var(--pct,50%)); outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:26px; height:26px; border-radius:50%;
+    background:var(--gold); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.5); }
+  input[type=range]::-moz-range-thumb { width:26px; height:26px; border:none; border-radius:50%; background:var(--gold); cursor:pointer; }
+  .scale { display:flex; justify-content:space-between; font-size:0.7rem; color:#555; margin-top:0.35rem; }
+  .capture { margin-top:2rem; }
+  label { display:block; font-size:0.78rem; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin:0 0 0.4rem 0.15rem; }
+  input[type=text],input[type=email],input[type=tel] { width:100%; background:#141414; border:1px solid #2a2a2a; color:var(--ink);
+    font-size:1.05rem; font-family:inherit; padding:0.9rem 1rem; border-radius:11px; margin-bottom:1rem; outline:none; }
+  input:focus { border-color:var(--gold); }
+  .btn { display:block; width:100%; text-align:center; border:none; cursor:pointer; text-decoration:none;
+    background:linear-gradient(135deg,#E5C254,#C49B2A); color:#0A0A0A; font-family:inherit; font-weight:600; font-size:1.12rem;
+    padding:1.05rem 1.25rem; border-radius:12px; box-shadow:0 10px 30px rgba(212,175,55,.22); margin-top:0.4rem; }
+  .btn[disabled] { opacity:.6; }
+  .err { color:#f5b7b1; text-align:center; font-size:0.9rem; margin:0.8rem 0; min-height:1rem; }
+  #results { display:none; }
+  #results .low { background:#141414; border:1px solid var(--gold); border-radius:14px; padding:1.4rem; margin:1.4rem 0; }
+  #results .low h2 { font-family:'Fraunces',serif; font-weight:400; font-size:1.35rem; color:var(--gold); margin-bottom:0.5rem; }
+  #results .low p { color:#bdbdbd; }
+  #results .grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem 1.2rem; margin:1.2rem 0; }
+  #results .grid div { display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding:0.4rem 0; }
+  #results .grid .s { font-family:'JetBrains Mono',monospace; color:var(--gold); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Sovereign Society</div>
+
+    <form id="form">
+      <h1>The Sovereign Code</h1>
+      <p class="lede">Eight pillars of a sovereign man. Score yourself 0 to 10, honest. Most men sit at a 4 or 5 and call it fine. Fine is exactly how they want you.</p>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      {% for p in pillars %}
+      <div class="pillar">
+        <div class="row"><span class="name">{{ p.name }}</span><span class="val" id="val_{{ p.slug }}">5</span></div>
+        <input type="range" name="score_{{ p.slug }}" min="0" max="10" value="5" step="1" data-slug="{{ p.slug }}">
+        <div class="scale"><span>0</span><span>10</span></div>
+      </div>
+      {% endfor %}
+
+      <div class="capture">
+        <p class="lede" style="margin:2rem auto 1.4rem">See your two weakest pillars and what to do about them.</p>
+        <label for="name">First name</label>
+        <input id="name" name="name" type="text" autocomplete="given-name" required>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required>
+        <label for="phone">Mobile <span style="text-transform:none;letter-spacing:0">(optional — get the Thursday texts)</span></label>
+        <input id="phone" name="phone" type="tel" autocomplete="tel">
+        <div class="err" id="err"></div>
+        <button class="btn" type="submit" id="submit">See where you stand</button>
+      </div>
+    </form>
+
+    <div id="results">
+      <h1 id="rhead">Here's where you stand.</h1>
+      <div class="low">
+        <h2 id="lowtitle"></h2>
+        <p>That's where they've got you. And that's where we go to work, every Thursday, shoulder to shoulder. Either you attack your two weakest, or you stay a 5 forever.</p>
+      </div>
+      <div class="grid" id="grid"></div>
+      <a class="btn" href="{{ url_for('join') }}">Come do it with men who mean it</a>
+    </div>
+  </div>
+
+<script>
+  const NAMES = { {% for p in pillars %}"{{ p.slug }}":"{{ p.name }}"{% if not loop.last %},{% endif %}{% endfor %} };
+  document.querySelectorAll('input[type=range]').forEach(r => {
+    const set = () => {
+      document.getElementById('val_' + r.dataset.slug).textContent = r.value;
+      r.style.setProperty('--pct', (r.value * 10) + '%');
+    };
+    r.addEventListener('input', set); set();
+  });
+  const form = document.getElementById('form'), err = document.getElementById('err'), btn = document.getElementById('submit');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); err.textContent = '';
+    btn.disabled = true; btn.textContent = 'Scoring...';
+    try {
+      const res = await fetch('{{ url_for("scorecard_submit") }}', { method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}, body:new FormData(form) });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.success) {
+        document.getElementById('rhead').textContent = d.first_name ? (d.first_name + ", here's where you stand.") : "Here's where you stand.";
+        document.getElementById('lowtitle').textContent = 'Your two weakest: ' + d.lowest.map(l => l.name + ' (' + l.score + ')').join(' and ') + '.';
+        const grid = document.getElementById('grid');
+        grid.innerHTML = Object.entries(d.scores).map(([slug,s]) => '<div><span>' + NAMES[slug] + '</span><span class="s">' + s + '</span></div>').join('');
+        form.style.display = 'none'; document.getElementById('results').style.display = 'block';
+        window.scrollTo(0,0);
+        return;
+      }
+      err.textContent = d.error || 'Something went wrong. Try again.';
+    } catch (_) { err.textContent = 'Network hiccup. Try again.'; }
+    btn.disabled = false; btn.textContent = 'See where you stand';
+  });
+</script>
+</body>
+</html>
