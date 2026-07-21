@@ -25,6 +25,9 @@
             <div class="form-group">
                 <label for="name">Name</label>
                 <input type="text" id="name" name="name" value="{{ current_user.name }}" required>
+
+                <label for="phone">Mobile</label>
+                <input type="tel" id="phone" name="phone" value="{{ current_user.phone or '' }}" placeholder="For meeting reminders + updates" autocomplete="tel">
             </div>
             <div class="form-group">
                 <label for="bio">Bio</label>

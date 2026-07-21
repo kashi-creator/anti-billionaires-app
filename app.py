@@ -1797,6 +1797,9 @@ def edit_profile():
     if request.method == "POST":
         current_user.name = request.form.get("name", current_user.name).strip()
         current_user.bio = request.form.get("bio", "").strip()
+        _new_phone = (request.form.get("phone") or "").strip()
+        _phone_changed = (_new_phone or None) != current_user.phone
+        current_user.phone = _new_phone or None
 
         if "profile_photo" in request.files:
             file = request.files["profile_photo"]
@@ -1814,6 +1817,10 @@ def edit_profile():
                     current_user.profile_photo = photo_path
 
         db.session.commit()
+
+        if _phone_changed and current_user.phone:
+            # Sync phone to GHL WITHOUT stage_tag so we don't clobber existing tags.
+            ghl.upsert_contact(email=current_user.email, name=current_user.name, phone=current_user.phone)
 
         if current_user.bio and current_user.profile_photo:
             from phase3_routes import _check_item_by_slug
@@ -2157,6 +2164,7 @@ def create_checkout_session():
             allow_promotion_codes=True,
             success_url=request.host_url.rstrip("/") + url_for("subscription_success") + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=request.host_url.rstrip("/") + url_for("pricing"),
+            phone_number_collection={"enabled": True},
             metadata={"email": email},
         )
         return jsonify({"checkout_url": session.url})
@@ -2202,6 +2210,7 @@ def join_checkout():
             allow_promotion_codes=True,
             success_url=request.host_url.rstrip("/") + url_for("subscription_success") + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=request.host_url.rstrip("/") + url_for("join"),
+            phone_number_collection={"enabled": True},
             metadata={"source": "door_kiosk"},
         )
         return redirect(session.url, code=303)
@@ -2265,10 +2274,9 @@ def scorecard_submit():
         return jsonify({"error": "Enter your name."}), 400
     if "@" not in email or "." not in email or len(email) > 200:
         return jsonify({"error": "Enter a valid email."}), 400
-    if phone:
-        digits = "".join(ch for ch in phone if ch.isdigit())
-        if len(digits) < 7 or len(phone) > 40:
-            return jsonify({"error": "That phone doesn't look right."}), 400
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 7 or len(phone) > 40:
+        return jsonify({"error": "Enter a valid mobile number."}), 400
     scores = {}
     for p in assessment_lib.PILLARS:
         raw = request.form.get(f"score_{p['slug']}")
@@ -2303,6 +2311,7 @@ def subscription_success():
         sub = stripe.Subscription.retrieve(stripe_session.subscription)
         email = stripe_session.metadata.get("email") or (stripe_session.customer_details.email if stripe_session.customer_details else "")
         email = (email or "").strip().lower()
+        phone = ((stripe_session.customer_details.phone if stripe_session.customer_details else "") or "").strip()
         stripe_customer_id = stripe_session.customer
         stripe_subscription_id = sub.id
         period_end = datetime.utcfromtimestamp(sub.current_period_end)
@@ -2320,6 +2329,11 @@ def subscription_success():
             existing_user.subscription_status = "active"
             existing_user.subscription_current_period_end = period_end
             db.session.commit()
+        if phone and not existing_user.phone:
+            existing_user.phone = phone
+            db.session.commit()
+            ghl.upsert_contact(email=existing_user.email, name=existing_user.name, phone=phone,
+                               stage_tag="active-member", custom_fields=ghl.custom_fields_from_user(existing_user))
         login_user(existing_user, remember=True)
         return _post_signup_redirect(existing_user)
 
@@ -2327,6 +2341,7 @@ def subscription_success():
         name = request.form.get("name", "").strip()
         password = request.form.get("password", "")
         confirm = request.form.get("confirm_password", "")
+        phone = (request.form.get("phone") or "").strip() or phone  # form wins, else Stripe-collected
 
         if not name or not password:
             flash("Name and password are required.", "error")
@@ -2348,6 +2363,7 @@ def subscription_success():
         user = User(
             name=name,
             email=email,
+            phone=phone or None,
             password_hash=hashed,
             profile_photo=profile_photo,
             points=0,
@@ -2370,7 +2386,7 @@ def subscription_success():
         # The webhook's invoice.payment_succeeded handler will idempotently
         # re-tag with the same value once Stripe processes the first invoice.
         ghl.upsert_contact(
-            email=email, name=name,
+            email=email, name=name, phone=phone or None,
             stage_tag="active-member",
             custom_fields=ghl.custom_fields_from_user(user),
         )
