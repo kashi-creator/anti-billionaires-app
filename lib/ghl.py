@@ -499,6 +499,36 @@ def _render_founder_html(*, name, email, phone, sms_opt_in, host, meeting_date, 
 """
 
 
+def list_contacts(max_pages: int = 25) -> list:
+    """Page through all contacts in the location via GHL's cursor pagination
+    (startAfter/startAfterId — the v2 API rejects `offset`). Returns a list of
+    contact dicts (id, tags, phone, email, ...). Empty on failure."""
+    if not _enabled():
+        return []
+    out: list = []
+    params = {"locationId": os.environ["GHL_LOCATION_ID"], "limit": 100}
+    for _ in range(max_pages):
+        try:
+            r = requests.get(f"{GHL_BASE}/contacts/", headers=_headers(), params=params, timeout=15)
+            if r.status_code >= 400:
+                log.warning("ghl.list_contacts %s: %s", r.status_code, r.text[:150])
+                break
+            data = r.json()
+            batch = data.get("contacts") if isinstance(data, dict) else data
+            if not batch:
+                break
+            out.extend(batch)
+            meta = (data.get("meta") if isinstance(data, dict) else {}) or {}
+            saf, safid = meta.get("startAfter"), meta.get("startAfterId")
+            if len(batch) < 100 or not safid:
+                break
+            params["startAfter"], params["startAfterId"] = saf, safid
+        except Exception as e:
+            log.warning("ghl.list_contacts failed: %s", e)
+            break
+    return out
+
+
 # ===== Door / kiosk walk-in check-in =====
 # The iPad at the door runs /kiosk -> QR -> /checkin. Each scan captures the
 # guest into GHL, tags attendance, increments the `meetings_attended` custom

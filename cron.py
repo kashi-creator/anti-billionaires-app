@@ -433,6 +433,84 @@ def cli_signup_reminders(dry_run):
     click.echo(f"[SIGNUP-REMINDERS] {stats}")
 
 
+# ===== Meeting invite + day-of reminder =====
+# Flask-owned event driver (the GHL CLI can't do calendar-aware sends). Reads
+# the next upcoming St. Pete chapter event from the DB and sends SMS via GHL
+# Conversations:
+#   - T-2 days: invite the sms-opted-in prospects to the next Thursday.
+#   - day-of:   remind the meeting-rsvp guests it's tonight.
+# Idempotent via per-event GHL marker tags (invited-<date> / reminded-<date>),
+# so re-running never double-sends. SMS only to contacts that have a phone.
+# Schedule: run daily ~9am ET (13:00 UTC).
+
+def run_meeting_reminders(dry_run: bool = False) -> dict:
+    from lib import ghl
+    from models import Event
+    today = datetime.utcnow().date()
+    ev = (
+        Event.query
+        .filter(Event.event_type == "chapter_recurring",
+                Event.is_recurrence_template == False,
+                Event.date >= today)
+        .order_by(Event.date.asc())
+        .first()
+    )
+    if not ev:
+        click.echo("[MEETING] no upcoming chapter event; nothing to do.")
+        return {"event": None, "invited": 0, "reminded": 0}
+
+    days_out = (ev.date - today).days
+    ds = ev.date.isoformat()
+    when_day = ev.date.strftime("%A")
+    when_time = ev.time or "6:30 PM"
+    where = ev.location or "The Temple, 155 8th St N, St. Pete"
+
+    if days_out not in (0, 2):
+        click.echo(f"[MEETING] next event {ds} is {days_out}d out (not 0 or 2); nothing to send.")
+        return {"event": ds, "days_out": days_out, "invited": 0, "reminded": 0}
+
+    contacts = ghl.list_contacts()
+    invited = reminded = 0
+
+    if days_out == 2:
+        marker = f"invited-{ds}"
+        msg = (f"{when_day}. {when_time}. {where}. The table fills with men who "
+               f"refuse to be average. First two are on us. You in?")
+        for c in contacts:
+            tags = {(t or '').lower() for t in (c.get('tags') or [])}
+            if {'sms-opted-in', 'prospect'} <= tags and marker not in tags and c.get('phone'):
+                if dry_run:
+                    invited += 1
+                    continue
+                if ghl.send_sms_to_contact(contact_id=c['id'], message=msg):
+                    ghl._add_tags(c['id'], [marker])
+                    invited += 1
+    elif days_out == 0:
+        marker = f"reminded-{ds}"
+        msg = f"Tonight. {when_time}. {where}. The table's set. Bring nothing but your presence."
+        for c in contacts:
+            tags = {(t or '').lower() for t in (c.get('tags') or [])}
+            if 'meeting-rsvp' in tags and marker not in tags and c.get('phone'):
+                if dry_run:
+                    reminded += 1
+                    continue
+                if ghl.send_sms_to_contact(contact_id=c['id'], message=msg):
+                    ghl._add_tags(c['id'], [marker])
+                    reminded += 1
+
+    click.echo(f"[MEETING] event={ds} days_out={days_out} invited={invited} reminded={reminded} dry_run={dry_run}")
+    return {"event": ds, "days_out": days_out, "invited": invited, "reminded": reminded}
+
+
+@cron_cli.command("meeting-reminders")
+@click.option("--dry-run", is_flag=True, help="Count who would be messaged without sending.")
+def cli_meeting_reminders(dry_run):
+    """flask cron meeting-reminders [--dry-run] -- invite (T-2) + day-of reminder
+    for the next St. Pete chapter meeting. Idempotent via GHL marker tags. Run
+    daily ~9am ET (13:00 UTC)."""
+    run_meeting_reminders(dry_run=dry_run)
+
+
 # ===== Team auto-post queue (Phase 14) =====
 #
 # The Sovereign Society Team user (prod id=11, email team@sovereignsociety.rich)
