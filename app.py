@@ -2538,6 +2538,33 @@ def _handle_payment_succeeded(data):
             except Exception as e:
                 print(f"[PUSH] first-payment notify failed: {e}")
 
+            # Celebration SMS to the referrer via GHL (stronger than a push).
+            try:
+                rc = ghl.find_contact_id_by_email(first_payment_referrer.email)
+                if rc:
+                    brothers = User.query.filter_by(referred_by=first_payment_referrer.id).count()
+                    ghl.send_sms_to_contact(contact_id=rc, message=(
+                        f"{user.name} just took a seat at the table through your link. "
+                        f"That's {brothers} you've brought. Keep building the tribe."))
+            except Exception as e:
+                print(f"[GHL] referrer celebration SMS failed: {e}")
+
+            # Community announcement from the Team account (first names only).
+            try:
+                from models import Post as _Post
+                team = User.query.filter_by(email="team@sovereignsociety.rich").first()
+                if team:
+                    new_first = (user.name or "A new brother").split()[0]
+                    inv_first = (first_payment_referrer.name or "a brother").split()[0]
+                    db.session.add(_Post(
+                        user_id=team.id, space_id=None,
+                        content=(f"{new_first} just took a seat at the table, brought by {inv_first}. "
+                                 f"The brotherhood grows. Welcome, {new_first}."),
+                    ))
+                    db.session.commit()
+            except Exception as e:
+                print(f"[FEED] referral announcement failed: {e}")
+
     # Receipt to the paying user
     amount = data.get("amount_paid", 0) or 0
     send_payment_succeeded(user, amount, user.payments_made_count, lifetime_unlocked=False)
