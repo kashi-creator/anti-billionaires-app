@@ -469,6 +469,18 @@ def run_meeting_reminders(dry_run: bool = False) -> dict:
         click.echo(f"[MEETING] next event {ds} is {days_out}d out (not 0 or 2); nothing to send.")
         return {"event": ds, "days_out": days_out, "invited": 0, "reminded": 0}
 
+    # Quiet-hours guard: never send outside ~8am-8pm ET even if the cron fires
+    # at an odd hour. Fail-safe — skips the day rather than texting at 5am.
+    if not dry_run:
+        try:
+            from zoneinfo import ZoneInfo
+            et_hour = datetime.now(ZoneInfo("America/New_York")).hour
+        except Exception:
+            et_hour = (datetime.utcnow().hour - 4) % 24
+        if not (8 <= et_hour <= 20):
+            click.echo(f"[MEETING] {et_hour:02d}:00 ET is outside the 8-20 send window; skipping.")
+            return {"event": ds, "days_out": days_out, "invited": 0, "reminded": 0, "skipped_quiet_hours": True}
+
     contacts = ghl.list_contacts()
     invited = reminded = 0
 

@@ -4,8 +4,8 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "/opt/venv/bin/flask cron reconcile",
-    "cronSchedule": "0 9 * * *",
+    "startCommand": "/opt/venv/bin/flask cron reconcile; /opt/venv/bin/flask cron meeting-reminders",
+    "cronSchedule": "0 13 * * *",
     "restartPolicyType": "NEVER"
   }
 }
