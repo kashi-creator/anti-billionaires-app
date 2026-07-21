@@ -482,36 +482,55 @@ def run_meeting_reminders(dry_run: bool = False) -> dict:
             return {"event": ds, "days_out": days_out, "invited": 0, "reminded": 0, "skipped_quiet_hours": True}
 
     contacts = ghl.list_contacts()
-    invited = reminded = 0
+    invited = member_reminders = guest_reminders = 0
+    MEMBER_TAGS = {'active-member', 'lifetime-qualified'}
 
     if days_out == 2:
+        # T-2 INVITE -> prospects only (members already belong, don't invite them)
         marker = f"invited-{ds}"
         msg = (f"{when_day}. {when_time}. {where}. The table fills with men who "
                f"refuse to be average. First two are on us. You in?")
         for c in contacts:
             tags = {(t or '').lower() for t in (c.get('tags') or [])}
-            if {'sms-opted-in', 'prospect'} <= tags and marker not in tags and c.get('phone'):
+            if ({'sms-opted-in', 'prospect'} <= tags and not (tags & MEMBER_TAGS)
+                    and marker not in tags and c.get('phone')):
                 if dry_run:
                     invited += 1
                     continue
                 if ghl.send_sms_to_contact(contact_id=c['id'], message=msg):
                     ghl._add_tags(c['id'], [marker])
                     invited += 1
+
     elif days_out == 0:
+        # DAY-OF REMINDER -> paying members + RSVP'd guests (different framing)
         marker = f"reminded-{ds}"
-        msg = f"Tonight. {when_time}. {where}. The table's set. Bring nothing but your presence."
+        member_msg = (f"Tonight. {when_time}. {where}. Your seat's paid. The men who "
+                      f"use it get sharper, the ones who don't fade out. Don't leave it empty.")
+        guest_msg = f"Tonight. {when_time}. {where}. The table's set. Bring nothing but your presence."
         for c in contacts:
             tags = {(t or '').lower() for t in (c.get('tags') or [])}
-            if 'meeting-rsvp' in tags and marker not in tags and c.get('phone'):
-                if dry_run:
-                    reminded += 1
+            if marker in tags or not c.get('phone'):
+                continue
+            if tags & MEMBER_TAGS:
+                msg, is_member = member_msg, True
+            elif 'meeting-rsvp' in tags:
+                msg, is_member = guest_msg, False
+            else:
+                continue
+            if not dry_run:
+                if not ghl.send_sms_to_contact(contact_id=c['id'], message=msg):
                     continue
-                if ghl.send_sms_to_contact(contact_id=c['id'], message=msg):
-                    ghl._add_tags(c['id'], [marker])
-                    reminded += 1
+                ghl._add_tags(c['id'], [marker])
+            if is_member:
+                member_reminders += 1
+            else:
+                guest_reminders += 1
 
-    click.echo(f"[MEETING] event={ds} days_out={days_out} invited={invited} reminded={reminded} dry_run={dry_run}")
-    return {"event": ds, "days_out": days_out, "invited": invited, "reminded": reminded}
+    click.echo(f"[MEETING] event={ds} ({when_day}) days_out={days_out}  "
+               f"invited={invited} member_reminders={member_reminders} guest_reminders={guest_reminders} "
+               f"dry_run={dry_run}")
+    return {"event": ds, "day": when_day, "days_out": days_out, "invited": invited,
+            "member_reminders": member_reminders, "guest_reminders": guest_reminders}
 
 
 @cron_cli.command("meeting-reminders")
